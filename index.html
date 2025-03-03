@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulateur de Cintrage</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" href="img/favicon.ico">
+</head>
+<body>
+    <header>
+        <h1>Simulateur de Cintrage</h1>
+        <nav>
+            <ul class="menu">
+                <li class="dropdown">
+                    <button class="dropbtn">Fichier</button>
+                    <div class="dropdown-content">
+                        <a href="#" id="nouveau-projet">Nouveau projet</a>
+                        <a href="#" id="exporter-dxf">Exporter en DXF</a>
+                        <a href="#" id="exporter-svg">Exporter en SVG</a>
+                    </div>
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="canvas-container">
+                <div class="label-frame">Visualisation</div>
+                <canvas id="visualization-canvas" width="1024" height="600"></canvas>
+            </div>
+
+            <div class="controls-panel">
+                <div class="panel-section">
+                    <div class="label-frame">Liste des cintrages</div>
+                    <div class="tree-container">
+                        <table id="cintrages-tree">
+                            <thead>
+                                <tr>
+                                    <th>Position (mm)</th>
+                                    <th>Angle (°)</th>
+                                    <th>Rayon (mm)</th>
+                                    <th>A (mm)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Les cintrages seront ajoutés ici par JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="buttons-container">
+                        <button id="btn-ajouter">Ajouter</button>
+                        <button id="btn-supprimer">Supprimer</button>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <div class="label-frame">Tube</div>
+                    <div class="form-grid">
+                        <label for="tube-diametre">Diamètre (mm)</label>
+                        <input type="number" id="tube-diametre" value="20" title="Diamètre extérieur du tube">
+
+                        <label for="tube-epaisseur">Épaisseur (mm)</label>
+                        <input type="number" id="tube-epaisseur" value="1.5" title="Épaisseur de la paroi du tube">
+
+                        <label for="tube-longueur">Longueur (mm)</label>
+                        <input type="number" id="tube-longueur" value="1000" title="Longueur totale du tube avant cintrage">
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <div class="label-frame">Cintrage</div>
+                    <div class="form-grid">
+                        <label for="cintrage-position">Position (mm)</label>
+                        <input type="number" id="cintrage-position" value="200" title="Distance depuis le début du tube jusqu'au point de cintrage">
+
+                        <label for="cintrage-angle">Angle (degrés)</label>
+                        <input type="number" id="cintrage-angle" value="90" title="Angle de cintrage désiré">
+
+                        <label for="cintrage-rayon">Rayon (mm)</label>
+                        <input type="number" id="cintrage-rayon" value="50" title="Rayon de cintrage intérieur">
+                    </div>
+                </div>
+
+                <div class="buttons-container">
+                    <button id="btn-simuler" class="action-button">▶ Simuler</button>
+                    <button id="btn-reinitialiser">↺ Réinitialiser</button>
+                </div>
+
+                <div class="panel-section">
+                    <div class="label-frame">Informations</div>
+                    <div class="info-text">
+                        Les dimensions sont en millimètres.<br>
+                        Le retour élastique est automatiquement compensé.
+                    </div>
+                    <div id="cintrages-info" class="info-text"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="status-bar">Prêt</div>
+
+    <div id="tooltip" class="tooltip"></div>
+
+    <!-- Modales pour les messages -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modal-title"></h2>
+            <p id="modal-message"></p>
+        </div>
+    </div>
+
+    <!-- Petit script pour vérifier que les clics sont bien détectés -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Ajouter un écouteur de clics global pour détecter tous les clics
+            document.body.addEventListener('click', function(e) {
+                console.log('Clic détecté sur:', e.target);
+            });
+            
+            // Essayer d'ajouter des écouteurs directs sur les boutons
+            setTimeout(function() {
+                try {
+                    const buttons = document.querySelectorAll('button');
+                    console.log(`${buttons.length} boutons trouvés`);
+                    
+                    buttons.forEach(function(button, index) {
+                        console.log(`Bouton ${index}:`, button.id || button.textContent.trim());
+                        
+                        // Ajouter un écouteur de clics direct
+                        button.addEventListener('click', function(e) {
+                            console.log('CLIC DIRECT SUR BOUTON:', e.target.id || e.target.textContent.trim());
+                            
+                            // Changer temporairement la couleur du bouton pour montrer que le clic fonctionne
+                            const originalColor = e.target.style.backgroundColor;
+                            e.target.style.backgroundColor = '#4CAF50';
+                            
+                            setTimeout(function() {
+                                e.target.style.backgroundColor = originalColor;
+                            }, 300);
+                        });
+                    });
+                } catch (e) {
+                    console.error('Erreur lors de l\'ajout des écouteurs directs:', e);
+                }
+            }, 500);
+        });
+    </script>
+    
+    <!-- Chargement des scripts -->
+    <script src="js/lib/file-saver.js"></script>
+    <script src="js/modules/calculs.js"></script>
+    <script src="js/modules/export.js"></script>
+    <script src="js/modules/interface.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
