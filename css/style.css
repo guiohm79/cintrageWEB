@@ -50,6 +50,7 @@ main {
 .dropdown {
     position: relative;
     display: inline-block;
+    z-index: 10; /* S'assurer que le dropdown est au-dessus des autres éléments */
 }
 
 .dropbtn {
@@ -67,7 +68,10 @@ main {
     background-color: #f9f9f9;
     min-width: 160px;
     box-shadow: var(--shadow);
-    z-index: 1;
+    z-index: 100;
+    right: 0; /* Aligner à droite du bouton */
+    max-height: 80vh; /* Limiter la hauteur à 80% de la hauteur de la fenêtre */
+    overflow-y: auto; /* Ajouter un défilement si nécessaire */
 }
 
 .dropdown-content a {

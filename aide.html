@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aide au Cintrage</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .aide-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .aide-section {
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .aide-section h2 {
+            color: #0D47A1;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .aide-section h3 {
+            color: #42A5F5;
+            margin-top: 20px;
+        }
+        
+        .aide-section p {
+            line-height: 1.6;
+        }
+        
+        .aide-section ul, .aide-section ol {
+            padding-left: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .aide-section li {
+            margin-bottom: 5px;
+        }
+        
+        .aide-section table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        .aide-section th, .aide-section td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        
+        .aide-section th {
+            background-color: #f2f2f2;
+        }
+        
+        .aide-section .warning {
+            background-color: #FFF3CD;
+            border-left: 4px solid #FFD700;
+            padding: 10px 15px;
+            margin: 15px 0;
+        }
+        
+        .aide-section .formula {
+            background-color: #E8F4F8;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        
+        .aide-section .image-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .aide-section img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .back-button {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 8px 15px;
+            background-color: #0D47A1;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Aide au Cintrage</h1>
+        <nav>
+            <ul class="menu">
+                <li><a href="index.html" class="back-button">Retour au simulateur</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="aide-container">
+        <div class="aide-section">
+            <h2>Introduction au cintrage de tubes</h2>
+            <p>Le cintrage de tubes est une opération technique qui consiste à courber un tube selon un angle et un rayon précis. Cette opération est couramment utilisée dans la plomberie, la construction métallique, et divers domaines industriels.</p>
+            <p>Cette aide est basée sur les informations techniques des cintreuses hydrauliques VIRAX modèles 2402 (manuelle) et 2408 (électrique), conçues pour le cintrage de tubes en fer de 17,2 mm à 114,3 mm (3/8" à 4").</p>
+        </div>
+
+        <div class="aide-section">
+            <h2>Principes fondamentaux du cintrage</h2>
+            <h3>Terminologie essentielle</h3>
+            <ul>
+                <li><strong>Angle de cintrage</strong> : L'angle de courbure souhaité, généralement exprimé en degrés.</li>
+                <li><strong>Rayon de cintrage</strong> : Le rayon intérieur de la courbe formée par le cintrage.</li>
+                <li><strong>Position de cintrage</strong> : Distance depuis l'extrémité du tube jusqu'au point où commence le cintrage.</li>
+                <li><strong>Valeur A (retrait)</strong> : La distance à déduire pour compenser l'effet du cintrage sur la longueur totale.</li>
+            </ul>
+            
+            <h3>Rayon minimal de cintrage</h3>
+            <p>Pour éviter l'écrasement ou la déformation excessive du tube, il est important de respecter un rayon minimal de cintrage.</p>
+            <div class="formula">
+                Rayon minimal = 20 × Diamètre nominal (DN) du tube
+            </div>
+            <div class="warning">
+                <strong>ATTENTION :</strong> La réalisation d'un rayon de cintrage inférieur à 20 fois le diamètre nominal engendre des efforts trop importants pour la cintreuse et peut la détériorer de manière irrémédiable.
+            </div>
+        </div>
+
+        <div class="aide-section">
+            <h2>Calcul de la valeur A (retrait)</h2>
+            <p>La valeur A représente la distance à déduire pour obtenir la dimension désirée après cintrage. Cette valeur est essentielle pour la précision de vos travaux.</p>
+            
+            <h3>Formule de calcul</h3>
+            <div class="formula">
+                Valeur A = Rayon de cintrage × 0,2146
+            </div>
+            <p>Cette formule est une approximation théorique. En pratique, la valeur A réelle peut être supérieure de 1 à 3 mm par rapport à la valeur théorique.</p>
+            
+            <h3>Exemple pratique</h3>
+            <p>Pour un tube de 1"1/4 (33,7 mm) avec une forme de rayon 135 mm :</p>
+            <div class="formula">
+                Valeur A = 135 × 0,2146 = 29 mm
+            </div>
+            <p>Pour obtenir une cote de 500 mm de l'extrémité à l'axe du tube une fois le cintre à 90° réalisé, il faut déduire la cote de 29 mm. Ainsi, on détermine un repère à placer au milieu de la forme.</p>
+        </div>
+
+        <div class="aide-section">
+            <h2>Tableau des rayons de cintrage disponibles</h2>
+            <h3>Formes de cintrage pour tubes gaz - Série moyenne et série forte</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ø"</th>
+                        <th>Rayon de cintrage (mm)</th>
+                        <th>Valeur A (mm)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>3/8"</td>
+                        <td>40</td>
+                        <td>9</td>
+                    </tr>
+                    <tr>
+                        <td>1/2"</td>
+                        <td>50</td>
+                        <td>11</td>
+                    </tr>
+                    <tr>
+                        <td>3/4"</td>
+                        <td>65</td>
+                        <td>14</td>
+                    </tr>
+                    <tr>
+                        <td>1"</td>
+                        <td>100</td>
+                        <td>21</td>
+                    </tr>
+                    <tr>
+                        <td>1"1/4</td>
+                        <td>135</td>
+                        <td>29</td>
+                    </tr>
+                    <tr>
+                        <td>1"1/2</td>
+                        <td>160</td>
+                        <td>34</td>
+                    </tr>
+                    <tr>
+                        <td>2"</td>
+                        <td>210</td>
+                        <td>45</td>
+                    </tr>
+                    <tr>
+                        <td>2"1/2</td>
+                        <td>350</td>
+                        <td>75</td>
+                    </tr>
+                    <tr>
+                        <td>3"</td>
+                        <td>420</td>
+                        <td>90</td>
+                    </tr>
+                    <tr>
+                        <td>3"1/2</td>
+                        <td>1800 (min)</td>
+                        <td>386</td>
+                    </tr>
+                    <tr>
+                        <td>4"</td>
+                        <td>2000 (min)</td>
+                        <td>429</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h3>Formes de cintrage pour tubes gaz - Série légère</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ø"</th>
+                        <th>Rayon de cintrage (mm)</th>
+                        <th>Valeur A (mm)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>3/8"</td>
+                        <td>70</td>
+                        <td>15</td>
+                    </tr>
+                    <tr>
+                        <td>1/2"</td>
+                        <td>85</td>
+                        <td>18</td>
+                    </tr>
+                    <tr>
+                        <td>3/4"</td>
+                        <td>110</td>
+                        <td>24</td>
+                    </tr>
+                    <tr>
+                        <td>1"</td>
+                        <td>135</td>
+                        <td>29</td>
+                    </tr>
+                    <tr>
+                        <td>1"1/4</td>
+                        <td>170</td>
+                        <td>36</td>
+                    </tr>
+                    <tr>
+                        <td>1"1/2</td>
+                        <td>200</td>
+                        <td>43</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="aide-section">
+            <h2>Techniques de cintrage</h2>
+            <h3>Préparation du cintrage</h3>
+            <ol>
+                <li>Vérifiez que le tube est propre et sans déformation.</li>
+                <li>Assurez-vous que la cintreuse est sur une surface stable et horizontale.</li>
+                <li>Pour l'utilisation du vérin, dévissez complètement la molette supérieure pour purger l'air.</li>
+                <li>Positionnez chaque diabolo symétriquement sur les flasques en fonction du diamètre du tube à cintrer.</li>
+            </ol>
+            
+            <h3>Réalisation du cintrage</h3>
+            <ul>
+                <li><strong>Modèle manuel 2402</strong> : Actionnez le levier verticalement jusqu'à atteindre l'angle désiré.</li>
+                <li><strong>Modèle électrique 2408</strong> : Positionnez l'interrupteur sur « Marche » jusqu'à atteindre l'angle désiré, puis positionnez l'interrupteur sur « Arrêt ».</li>
+                <li>Pour ramener le piston en position initiale après le cintrage, dévissez la molette grise.</li>
+            </ul>
+            
+            <h3>Cintrage à angles multiples</h3>
+            <p>Pour réaliser plusieurs cintrages sur un même tube :</p>
+            <ol>
+                <li>Réalisez le premier cintrage selon les instructions ci-dessus.</li>
+                <li>Pour les cintrages suivants, tenez compte de l'orientation du tube et de la direction souhaitée pour le nouveau cintrage.</li>
+                <li>Pour un cintrage dans le même plan mais dans la direction opposée, utilisez un angle négatif (par exemple -90° pour un cintrage à 90° vers la droite).</li>
+                <li>Vérifiez régulièrement les mesures pour assurer la précision du résultat final.</li>
+            </ol>
+        </div>
+
+        <div class="aide-section">
+            <h2>Conseils et précautions</h2>
+            <h3>Conseils pratiques</h3>
+            <ul>
+                <li>Marquez toujours l'emplacement du cintrage sur le tube avant de commencer.</li>
+                <li>Pour les tubes de grand diamètre, envisagez de réaliser le cintrage par points (en plusieurs étapes).</li>
+                <li>La longueur développée du tube après cintrage sera plus courte que la longueur initiale du tube droit.</li>
+                <li>Pour les cintrages à grand angle, prévoyez une longueur de tube suffisante.</li>
+            </ul>
+            
+            <h3>Précautions de sécurité</h3>
+            <div class="warning">
+                <ul>
+                    <li>Ne pas mettre les pieds ni les mains sur les diabolos, formes ou tubes pendant le fonctionnement du vérin.</li>
+                    <li>Toujours positionner symétriquement les diabolos, et bien les emboîter, pour ne pas détériorer le vérin.</li>
+                    <li>Ne pas utiliser l'appareil pour le cintrage de tubes autres que ceux prévus (acier ou fer).</li>
+                    <li>Vérifier que l'outil est en bon état avant utilisation.</li>
+                    <li>Porter des équipements de protection appropriés (gants, chaussures de sécurité).</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Simulateur de Cintrage - Basé sur les informations techniques des cintreuses VIRAX</p>
+    </footer>
+</body>
+</html>

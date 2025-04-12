@@ -348,9 +348,8 @@ window.Interface = class Interface {
         tbody.innerHTML = '';
         
         this.calculateur.multiCintrage.cintrages.forEach(cintrage => {
-            const valeurA = Math.abs(cintrage.angle - 90) < 0.1 
-                ? this.calculateur.calculerValeurA(cintrage.rayon, cintrage.angle).toFixed(1)
-                : '-';
+            // Calculer la valeur A pour tous les angles
+            const valeurA = this.calculateur.calculerValeurA(cintrage.rayon, Math.abs(cintrage.angle)).toFixed(1);
                 
             const tr = document.createElement('tr');
             tr.innerHTML = `
