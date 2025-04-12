@@ -123,6 +123,17 @@ window.Interface = class Interface {
             } else {
                 console.error('Élément exporter-svg non trouvé');
             }
+            
+            const btnExporterPDF = document.getElementById('exporter-pdf');
+            if (btnExporterPDF) {
+                btnExporterPDF.addEventListener('click', (e) => {
+                    console.log('Bouton Exporter PDF cliqué');
+                    e.preventDefault();
+                    this.exporterPDF();
+                });
+            } else {
+                console.error('Élément exporter-pdf non trouvé');
+            }
 
             // Boutons de gestion des cintrages
             const btnAjouter = document.getElementById('btn-ajouter');
@@ -701,6 +712,43 @@ window.Interface = class Interface {
             console.error('Erreur lors de l\'export DXF:', e);
             this.setStatus('Erreur lors de l\'export DXF');
             this.showModal('Erreur', `Erreur lors de l'export DXF: ${e.message}`);
+        }
+    }
+    
+    /**
+     * Exporte le dessin en format PDF
+     */
+    exporterPDF() {
+        try {
+            // Récupération des paramètres du tube
+            const diametre = parseFloat(document.getElementById('tube-diametre').value);
+            const epaisseur = parseFloat(document.getElementById('tube-epaisseur').value);
+            const longueur = parseFloat(document.getElementById('tube-longueur').value);
+            
+            if (isNaN(diametre) || isNaN(epaisseur) || isNaN(longueur)) {
+                throw new Error('Veuillez entrer des valeurs numériques valides pour le tube');
+            }
+            
+            const paramsTube = new ParametresTube(diametre, epaisseur, longueur);
+            
+            // Calcul des points du tube
+            const points = this.calculateur.calculerPointsTube(paramsTube);
+            
+            // Créer l'exporteur
+            const exporteur = new ExporteurPlans();
+            
+            // Récupérer la liste des cintrages
+            const cintrages = this.calculateur.multiCintrage.cintrages;
+            
+            // Exporter en PDF avec les détails techniques
+            exporteur.exporterPDF(points, 'tube_cintre.pdf', paramsTube, cintrages);
+            
+            this.setStatus('Fichier PDF exporté avec détails techniques');
+            this.showModal('Succès', 'Le fichier PDF a été créé avec succès et inclut les détails techniques');
+        } catch (e) {
+            console.error('Erreur lors de l\'export PDF:', e);
+            this.setStatus('Erreur lors de l\'export PDF');
+            this.showModal('Erreur', `Erreur lors de l'export PDF: ${e.message}`);
         }
     }
 };

@@ -188,28 +188,58 @@ window.CalculateurCintrage = class CalculateurCintrage {
             // Calcul de l'arc de cintrage
             const angleRad = cintrage.angle * Math.PI / 180;
             const rayonEffectif = cintrage.rayon / this.coefficientRetourElastique;
-
+            
             // Points de l'arc
             const nbPoints = 40; // Plus de points pour un arc plus lisse
-
-            // Centre de rotation pour l'arc
-            const centreX = xCourant - rayonEffectif * Math.sin(angleCourant);
-            const centreY = yCourant + rayonEffectif * Math.cos(angleCourant);
-
+            
+            // Déterminer si le cintrage est vers la gauche (angle négatif) ou vers la droite (angle positif)
+            const sensHoraire = angleRad < 0;
+            const angleRadAbs = Math.abs(angleRad);
+            
+            // Centre de rotation pour l'arc - différent selon le sens du cintrage
+            let centreX, centreY;
+            
+            if (sensHoraire) {
+                // Cintrage vers la droite (sens horaire) - angle négatif
+                centreX = xCourant + rayonEffectif * Math.sin(angleCourant);
+                centreY = yCourant - rayonEffectif * Math.cos(angleCourant);
+            } else {
+                // Cintrage vers la gauche (sens anti-horaire) - angle positif
+                centreX = xCourant - rayonEffectif * Math.sin(angleCourant);
+                centreY = yCourant + rayonEffectif * Math.cos(angleCourant);
+            }
+            
             for (let j = 0; j <= nbPoints; j++) {
                 const t = j / nbPoints;
-                const angleArc = angleRad * t;
-
-                // Rotation autour du centre
-                const x = centreX + rayonEffectif * Math.sin(angleCourant + angleArc);
-                const y = centreY - rayonEffectif * Math.cos(angleCourant + angleArc);
+                const angleArc = angleRadAbs * t;
+                
+                // Rotation autour du centre - direction dépend du sens du cintrage
+                let x, y;
+                
+                if (sensHoraire) {
+                    // Sens horaire (vers la droite)
+                    x = centreX - rayonEffectif * Math.sin(angleCourant - angleArc);
+                    y = centreY + rayonEffectif * Math.cos(angleCourant - angleArc);
+                } else {
+                    // Sens anti-horaire (vers la gauche)
+                    x = centreX + rayonEffectif * Math.sin(angleCourant + angleArc);
+                    y = centreY - rayonEffectif * Math.cos(angleCourant + angleArc);
+                }
+                
                 points.push([x, y]);
             }
 
             // Mise à jour de la position et de l'angle
             xCourant = points[points.length - 1][0];
             yCourant = points[points.length - 1][1];
-            angleCourant += angleRad;
+            
+            // L'angle courant est toujours mis à jour avec la valeur absolue
+            // mais dans la direction appropriée
+            if (angleRad < 0) {
+                angleCourant -= Math.abs(angleRad); // Rotation dans le sens horaire
+            } else {
+                angleCourant += angleRad; // Rotation dans le sens anti-horaire
+            }
         }
 
         // Segment final
