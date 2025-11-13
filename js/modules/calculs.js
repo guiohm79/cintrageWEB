@@ -75,8 +75,26 @@ window.CalculMultiCintrage = class CalculMultiCintrage {
  */
 window.CalculateurCintrage = class CalculateurCintrage {
     constructor() {
-        this.coefficientRetourElastique = 0.975; // Facteur de correction pour le retour élastique
+        this.coefficientRetourElastique = 0.975; // Facteur de correction pour le retour élastique (valeur par défaut)
+        this.facteurRayonMin = 20; // Facteur pour le rayon minimum (par défaut)
         this.multiCintrage = new CalculMultiCintrage();
+        this.materiau = null; // Matériau actuellement sélectionné
+    }
+
+    /**
+     * Définit le matériau et met à jour les coefficients
+     * @param {Materiau} materiau - Le matériau à utiliser
+     */
+    setMateriau(materiau) {
+        this.materiau = materiau;
+        if (materiau) {
+            this.coefficientRetourElastique = materiau.coefficientRetourElastique;
+            this.facteurRayonMin = materiau.facteurRayonMin;
+        } else {
+            // Valeurs par défaut (acier)
+            this.coefficientRetourElastique = 0.975;
+            this.facteurRayonMin = 20;
+        }
     }
 
     /**
@@ -288,15 +306,91 @@ window.CalculateurCintrage = class CalculateurCintrage {
 
     /**
      * Calcule la valeur A à retrancher pour obtenir la dimension désirée
+     * Formule générale : A = R × tan(α/2)
      * @param {number} rayon - Le rayon de cintrage
      * @param {number} angle - L'angle de cintrage en degrés
      * @returns {number} La valeur A à retrancher
      */
     calculerValeurA(rayon, angle) {
-        if (Math.abs(angle - 90) < 0.1) { // On vérifie si l'angle est proche de 90°
-            return 0.215 * rayon;
+        // Utiliser la formule générale pour tous les angles
+        // A = R × tan(α/2)
+        const angleRad = Math.abs(angle) * Math.PI / 180;
+        return rayon * Math.tan(angleRad / 2);
+    }
+
+    /**
+     * Calcule le rayon minimum recommandé pour un diamètre donné
+     * Formule : Rayon min = facteurRayonMin × Diamètre nominal
+     * Le facteur dépend du matériau (défini par setMateriau)
+     * @param {number} diametre - Diamètre du tube en mm
+     * @returns {number} Rayon minimum en mm
+     */
+    calculerRayonMinimum(diametre) {
+        return this.facteurRayonMin * diametre;
+    }
+
+    /**
+     * Valide les paramètres de cintrage
+     * @param {ParametresTube} paramsTube - Paramètres du tube
+     * @param {ParametresCintrage} paramsCintrage - Paramètres du cintrage
+     * @returns {Object} Résultat de validation {valide: boolean, avertissements: string[], erreurs: string[]}
+     */
+    validerCintrage(paramsTube, paramsCintrage) {
+        const resultat = {
+            valide: true,
+            avertissements: [],
+            erreurs: []
+        };
+
+        // Vérifier le rayon minimum
+        const rayonMin = this.calculerRayonMinimum(paramsTube.diametre);
+        if (paramsCintrage.rayon < rayonMin) {
+            resultat.erreurs.push(
+                `Rayon trop petit : ${paramsCintrage.rayon.toFixed(1)}mm. ` +
+                `Rayon minimum recommandé : ${rayonMin.toFixed(1)}mm (20 × diamètre)`
+            );
+            resultat.valide = false;
+        } else if (paramsCintrage.rayon < rayonMin * 1.2) {
+            // Avertissement si rayon < 24× diamètre (zone limite)
+            resultat.avertissements.push(
+                `Rayon proche de la limite. Risque d'écrasement ou de plissage. ` +
+                `Recommandé : ${(rayonMin * 1.2).toFixed(1)}mm ou plus`
+            );
         }
-        return 0; // Pour les autres angles, à implémenter selon les besoins
+
+        // Vérifier que la position est dans les limites du tube
+        if (paramsCintrage.position < 0 || paramsCintrage.position > paramsTube.longueur) {
+            resultat.erreurs.push(
+                `Position invalide : ${paramsCintrage.position.toFixed(1)}mm. ` +
+                `Doit être entre 0 et ${paramsTube.longueur.toFixed(1)}mm`
+            );
+            resultat.valide = false;
+        }
+
+        // Vérifier que l'angle n'est pas nul
+        if (Math.abs(paramsCintrage.angle) < 0.1) {
+            resultat.erreurs.push('Angle trop petit. L\'angle doit être supérieur à 0.1°');
+            resultat.valide = false;
+        }
+
+        // Avertissement pour angles extrêmes
+        if (Math.abs(paramsCintrage.angle) > 180) {
+            resultat.avertissements.push(
+                `Angle très important : ${paramsCintrage.angle.toFixed(1)}°. ` +
+                `Vérifiez que c'est bien l'angle souhaité`
+            );
+        }
+
+        // Vérifier l'épaisseur du tube
+        if (paramsTube.epaisseur >= paramsTube.diametre / 2) {
+            resultat.erreurs.push(
+                `Épaisseur invalide : ${paramsTube.epaisseur.toFixed(1)}mm. ` +
+                `Doit être inférieure au rayon du tube (${(paramsTube.diametre / 2).toFixed(1)}mm)`
+            );
+            resultat.valide = false;
+        }
+
+        return resultat;
     }
 };
 
