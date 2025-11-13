@@ -15,6 +15,7 @@ window.Interface = class Interface {
             // Initialiser les bibliothèques
             this.bibliothequeMateriaux = new BibliothequeMateriaux();
             this.bibliothequeTubes = new BibliothequeTubes();
+            this.gestionnaireProjets = new GestionnaireProjets();
 
             // Récupération des éléments DOM
             this.canvas = document.getElementById('visualization-canvas');
@@ -228,10 +229,42 @@ window.Interface = class Interface {
                 btnNouveauProjet.addEventListener('click', (e) => {
                     console.log('Bouton Nouveau projet cliqué');
                     e.preventDefault();
-                    this.reinitialiser();
+                    this.nouveauProjet();
                 });
             } else {
                 console.error('Élément nouveau-projet non trouvé');
+            }
+
+            const btnSauvegarderProjet = document.getElementById('sauvegarder-projet');
+            if (btnSauvegarderProjet) {
+                btnSauvegarderProjet.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.sauvegarderProjet();
+                });
+            }
+
+            const btnChargerProjet = document.getElementById('charger-projet');
+            if (btnChargerProjet) {
+                btnChargerProjet.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.chargerProjet();
+                });
+            }
+
+            const btnExporterProjetJSON = document.getElementById('exporter-projet-json');
+            if (btnExporterProjetJSON) {
+                btnExporterProjetJSON.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.exporterProjetJSON();
+                });
+            }
+
+            const btnImporterProjetJSON = document.getElementById('importer-projet-json');
+            if (btnImporterProjetJSON) {
+                btnImporterProjetJSON.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.importerProjetJSON();
+                });
             }
             
             const btnExporterDXF = document.getElementById('exporter-dxf');
@@ -926,6 +959,211 @@ window.Interface = class Interface {
             this.setStatus('Erreur lors de l\'export PDF');
             this.showModal('Erreur', `Erreur lors de l'export PDF: ${e.message}`);
         }
+    }
+
+    /**
+     * Crée un nouveau projet (réinitialise l'application)
+     */
+    nouveauProjet() {
+        if (this.calculateur.multiCintrage.cintrages.length > 0) {
+            if (confirm('Créer un nouveau projet effacera le projet actuel. Voulez-vous continuer ?')) {
+                this.reinitialiser();
+                this.setStatus('Nouveau projet créé');
+            }
+        } else {
+            this.reinitialiser();
+            this.setStatus('Nouveau projet créé');
+        }
+    }
+
+    /**
+     * Sauvegarde le projet actuel
+     */
+    sauvegarderProjet() {
+        try {
+            const nomProjet = prompt('Nom du projet :', 'Projet ' + new Date().toLocaleDateString());
+
+            if (!nomProjet) {
+                return; // Annulé
+            }
+
+            // Récupérer l'état actuel
+            const diametre = parseFloat(document.getElementById('tube-diametre').value);
+            const epaisseur = parseFloat(document.getElementById('tube-epaisseur').value);
+            const longueur = parseFloat(document.getElementById('tube-longueur').value);
+            const materiauId = document.getElementById('tube-materiau').value;
+
+            const parametresTube = {
+                diametre,
+                epaisseur,
+                longueur
+            };
+
+            const cintrages = this.calculateur.multiCintrage.cintrages.map(c => ({
+                angle: c.angle,
+                rayon: c.rayon,
+                position: c.position
+            }));
+
+            const projet = new ProjetCintrage(nomProjet, parametresTube, materiauId, cintrages);
+
+            if (this.gestionnaireProjets.sauvegarderProjet(projet)) {
+                this.setStatus(`Projet "${nomProjet}" sauvegardé`);
+                this.showModal('Succès', `Le projet "${nomProjet}" a été sauvegardé avec succès.`);
+            } else {
+                throw new Error('Échec de la sauvegarde');
+            }
+        } catch (e) {
+            console.error('Erreur lors de la sauvegarde:', e);
+            this.showModal('Erreur', `Erreur lors de la sauvegarde : ${e.message}`);
+        }
+    }
+
+    /**
+     * Charge un projet sauvegardé
+     */
+    chargerProjet() {
+        try {
+            const projets = this.gestionnaireProjets.listerProjets();
+
+            if (projets.length === 0) {
+                this.showModal('Information', 'Aucun projet sauvegardé trouvé.');
+                return;
+            }
+
+            // Créer une liste de choix
+            let message = 'Sélectionnez un projet à charger :\n\n';
+            projets.forEach((p, index) => {
+                const date = new Date(p.dateModification).toLocaleString();
+                message += `${index + 1}. ${p.nom} (modifié le ${date})\n`;
+            });
+
+            const choix = prompt(message + '\nEntrez le numéro du projet :');
+
+            if (!choix) {
+                return; // Annulé
+            }
+
+            const index = parseInt(choix) - 1;
+
+            if (index < 0 || index >= projets.length) {
+                throw new Error('Numéro de projet invalide');
+            }
+
+            const projet = ProjetCintrage.fromJSON(projets[index]);
+            this.appliquerProjet(projet);
+            this.setStatus(`Projet "${projet.nom}" chargé`);
+            this.showModal('Succès', `Le projet "${projet.nom}" a été chargé avec succès.`);
+        } catch (e) {
+            console.error('Erreur lors du chargement:', e);
+            this.showModal('Erreur', `Erreur lors du chargement : ${e.message}`);
+        }
+    }
+
+    /**
+     * Applique un projet chargé à l'interface
+     * @param {ProjetCintrage} projet - Le projet à appliquer
+     */
+    appliquerProjet(projet) {
+        // Réinitialiser d'abord
+        this.reinitialiser();
+
+        // Appliquer les paramètres du tube
+        document.getElementById('tube-diametre').value = projet.parametresTube.diametre;
+        document.getElementById('tube-epaisseur').value = projet.parametresTube.epaisseur;
+        document.getElementById('tube-longueur').value = projet.parametresTube.longueur;
+
+        // Appliquer le matériau
+        document.getElementById('tube-materiau').value = projet.materiauId;
+        this.onMateriauChange(projet.materiauId);
+
+        // Appliquer les cintrages
+        projet.cintrages.forEach(c => {
+            const paramsCintrage = new ParametresCintrage(c.angle, c.rayon, c.position);
+            this.calculateur.multiCintrage.ajouterCintrage(paramsCintrage);
+        });
+
+        this.mettreAJourListeCintrages();
+        this.mettreAJourRayonMinimum();
+    }
+
+    /**
+     * Exporte le projet actuel en JSON
+     */
+    exporterProjetJSON() {
+        try {
+            const nomProjet = prompt('Nom du fichier (sans extension) :', 'projet_cintrage');
+
+            if (!nomProjet) {
+                return; // Annulé
+            }
+
+            // Récupérer l'état actuel
+            const diametre = parseFloat(document.getElementById('tube-diametre').value);
+            const epaisseur = parseFloat(document.getElementById('tube-epaisseur').value);
+            const longueur = parseFloat(document.getElementById('tube-longueur').value);
+            const materiauId = document.getElementById('tube-materiau').value;
+
+            const parametresTube = {
+                diametre,
+                epaisseur,
+                longueur
+            };
+
+            const cintrages = this.calculateur.multiCintrage.cintrages.map(c => ({
+                angle: c.angle,
+                rayon: c.rayon,
+                position: c.position
+            }));
+
+            const projet = new ProjetCintrage(nomProjet, parametresTube, materiauId, cintrages);
+            this.gestionnaireProjets.exporterProjetJSON(projet, nomProjet);
+
+            this.setStatus('Projet exporté en JSON');
+            this.showModal('Succès', 'Le projet a été exporté avec succès.');
+        } catch (e) {
+            console.error('Erreur lors de l\'export JSON:', e);
+            this.showModal('Erreur', `Erreur lors de l'export : ${e.message}`);
+        }
+    }
+
+    /**
+     * Importe un projet depuis un fichier JSON
+     */
+    importerProjetJSON() {
+        const fileInput = document.getElementById('file-input-json');
+
+        if (!fileInput) {
+            this.showModal('Erreur', 'Élément d\'import de fichier non trouvé');
+            return;
+        }
+
+        // Déclencher le sélecteur de fichier
+        fileInput.click();
+
+        // Gérer la sélection de fichier
+        fileInput.onchange = async (e) => {
+            try {
+                const file = e.target.files[0];
+
+                if (!file) {
+                    return; // Annulé
+                }
+
+                const projet = await this.gestionnaireProjets.importerProjetJSON(file);
+                this.appliquerProjet(projet);
+
+                this.setStatus(`Projet "${projet.nom}" importé`);
+                this.showModal('Succès', `Le projet "${projet.nom}" a été importé avec succès.`);
+
+                // Réinitialiser l'input
+                fileInput.value = '';
+            } catch (e) {
+                console.error('Erreur lors de l\'import:', e);
+                this.showModal('Erreur', `Erreur lors de l'import : ${e.message}`);
+                fileInput.value = '';
+            }
+        };
     }
 };
 

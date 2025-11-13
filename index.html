@@ -16,6 +16,11 @@
                     <button class="dropbtn">Fichier</button>
                     <div class="dropdown-content">
                         <a href="#" id="nouveau-projet">Nouveau projet</a>
+                        <a href="#" id="sauvegarder-projet">Sauvegarder projet</a>
+                        <a href="#" id="charger-projet">Charger projet</a>
+                        <a href="#" id="exporter-projet-json">Exporter projet (JSON)</a>
+                        <a href="#" id="importer-projet-json">Importer projet (JSON)</a>
+                        <hr style="margin: 5px 0; border: none; border-top: 1px solid #ddd;">
                         <a href="#" id="exporter-dxf">Exporter en DXF</a>
                         <a href="#" id="exporter-svg">Exporter en SVG</a>
                         <a href="#" id="exporter-pdf">Exporter en PDF</a>
@@ -65,14 +70,27 @@
                 <div class="panel-section">
                     <div class="label-frame">Tube</div>
                     <div class="form-grid">
+                        <label for="tube-standard">Tube standard</label>
+                        <select id="tube-standard" title="Sélectionner un tube standard ou choisir 'Personnalisé'">
+                            <option value="">Personnalisé</option>
+                        </select>
+
+                        <label for="tube-materiau">Matériau</label>
+                        <select id="tube-materiau" title="Matériau du tube (influence le retour élastique)">
+                            <option value="acier">Acier doux</option>
+                        </select>
+
                         <label for="tube-diametre">Diamètre (mm)</label>
-                        <input type="number" id="tube-diametre" value="20" title="Diamètre extérieur du tube">
+                        <input type="number" id="tube-diametre" value="20" step="0.1" title="Diamètre extérieur du tube">
 
                         <label for="tube-epaisseur">Épaisseur (mm)</label>
-                        <input type="number" id="tube-epaisseur" value="1.5" title="Épaisseur de la paroi du tube">
+                        <input type="number" id="tube-epaisseur" value="1.5" step="0.1" title="Épaisseur de la paroi du tube">
 
                         <label for="tube-longueur">Longueur (mm)</label>
-                        <input type="number" id="tube-longueur" value="1000" title="Longueur totale du tube avant cintrage">
+                        <input type="number" id="tube-longueur" value="1000" step="1" title="Longueur totale du tube avant cintrage">
+
+                        <label for="rayon-min-info">Rayon min.</label>
+                        <span id="rayon-min-info" style="padding: 8px; color: #666; font-size: 0.9em;">-</span>
                     </div>
                 </div>
 
@@ -111,6 +129,9 @@
 
     <div id="tooltip" class="tooltip"></div>
 
+    <!-- Input caché pour l'import de fichiers JSON -->
+    <input type="file" id="file-input-json" accept=".json" style="display: none;">
+
     <!-- Modales pour les messages -->
     <div id="modal" class="modal">
         <div class="modal-content">
@@ -120,47 +141,13 @@
         </div>
     </div>
 
-    <!-- Petit script pour vérifier que les clics sont bien détectés -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Ajouter un écouteur de clics global pour détecter tous les clics
-            document.body.addEventListener('click', function(e) {
-                console.log('Clic détecté sur:', e.target);
-            });
-            
-            // Essayer d'ajouter des écouteurs directs sur les boutons
-            setTimeout(function() {
-                try {
-                    const buttons = document.querySelectorAll('button');
-                    console.log(`${buttons.length} boutons trouvés`);
-                    
-                    buttons.forEach(function(button, index) {
-                        console.log(`Bouton ${index}:`, button.id || button.textContent.trim());
-                        
-                        // Ajouter un écouteur de clics direct
-                        button.addEventListener('click', function(e) {
-                            console.log('CLIC DIRECT SUR BOUTON:', e.target.id || e.target.textContent.trim());
-                            
-                            // Changer temporairement la couleur du bouton pour montrer que le clic fonctionne
-                            const originalColor = e.target.style.backgroundColor;
-                            e.target.style.backgroundColor = '#4CAF50';
-                            
-                            setTimeout(function() {
-                                e.target.style.backgroundColor = originalColor;
-                            }, 300);
-                        });
-                    });
-                } catch (e) {
-                    console.error('Erreur lors de l\'ajout des écouteurs directs:', e);
-                }
-            }, 500);
-        });
-    </script>
-    
     <!-- Chargement des scripts -->
     <script src="js/lib/file-saver.js"></script>
     <script src="js/lib/jspdf.min.js"></script>
     <script src="js/modules/calculs.js"></script>
+    <script src="js/modules/materiaux.js"></script>
+    <script src="js/modules/tubes-standards.js"></script>
+    <script src="js/modules/projets.js"></script>
     <script src="js/modules/export.js"></script>
     <script src="js/modules/interface.js"></script>
     <script src="js/main.js"></script>
