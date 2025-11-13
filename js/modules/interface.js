@@ -8,44 +8,176 @@ window.Interface = class Interface {
      */
     constructor(calculateur) {
         console.log('Initialisation de l\'interface...');
-        
+
         try {
             this.calculateur = calculateur;
-            
+
+            // Initialiser les bibliothèques
+            this.bibliothequeMateriaux = new BibliothequeMateriaux();
+            this.bibliothequeTubes = new BibliothequeTubes();
+
             // Récupération des éléments DOM
             this.canvas = document.getElementById('visualization-canvas');
             if (!this.canvas) {
                 throw new Error('Élément canvas non trouvé');
             }
-            
+
             this.ctx = this.canvas.getContext('2d');
             this.statusBar = document.getElementById('status-bar');
             this.cintragesInfo = document.getElementById('cintrages-info');
-            
+
             this.tooltip = document.getElementById('tooltip');
             this.modal = document.getElementById('modal');
             this.modalTitle = document.getElementById('modal-title');
             this.modalMessage = document.getElementById('modal-message');
-            
+
             this.selectedCintrageIndex = -1;
-            
+
+            // Peupler les sélecteurs
+            this.initialiserSelecteurs();
+
             // Mise en place des écouteurs d'événements
             this.setupEventListeners();
-            
+
+            // Mettre à jour le rayon minimum initial
+            this.mettreAJourRayonMinimum();
+
             // Dessiner la grille initiale
             console.log('Dessin de la grille initiale...');
             this.dessinerGrille();
-            
+
             // Afficher un message de bienvenue
             this.setStatus('Prêt - Entrez les paramètres et cliquez sur Simuler');
-            
+
             console.log('Interface initialisée avec succès');
         } catch (error) {
             console.error('Erreur lors de l\'initialisation de l\'interface:', error);
             this.afficherErreurInterface(error.message);
         }
     }
-    
+
+    /**
+     * Initialise les sélecteurs de matériaux et tubes standards
+     */
+    initialiserSelecteurs() {
+        // Peupler le sélecteur de matériaux
+        const selectMateriau = document.getElementById('tube-materiau');
+        if (selectMateriau) {
+            selectMateriau.innerHTML = ''; // Vider
+
+            const materiaux = this.bibliothequeMateriaux.getTousMateriaux();
+            materiaux.forEach(({ id, materiau }) => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = materiau.nom;
+                option.title = materiau.description;
+                selectMateriau.appendChild(option);
+            });
+
+            // Sélectionner l'acier par défaut
+            selectMateriau.value = 'acier';
+            this.calculateur.setMateriau(this.bibliothequeMateriaux.getMateriau('acier'));
+        }
+
+        // Peupler le sélecteur de tubes standards
+        const selectTube = document.getElementById('tube-standard');
+        if (selectTube) {
+            // L'option "Personnalisé" est déjà présente dans le HTML
+
+            const tubes = this.bibliothequeTubes.getTousTubes();
+
+            // Grouper par norme
+            const normes = this.bibliothequeTubes.getNormes();
+            normes.forEach(norme => {
+                const tubesNorme = tubes.filter(tube => tube.norme === norme);
+
+                if (tubesNorme.length > 0) {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = norme;
+
+                    tubesNorme.forEach((tube, index) => {
+                        const option = document.createElement('option');
+                        option.value = tubes.indexOf(tube); // Utiliser l'index dans la liste complète
+                        option.textContent = tube.getDescription();
+                        optgroup.appendChild(option);
+                    });
+
+                    selectTube.appendChild(optgroup);
+                }
+            });
+        }
+    }
+
+    /**
+     * Met à jour l'affichage du rayon minimum
+     */
+    mettreAJourRayonMinimum() {
+        const diametre = parseFloat(document.getElementById('tube-diametre').value);
+        const rayonMinInfo = document.getElementById('rayon-min-info');
+
+        if (!isNaN(diametre) && rayonMinInfo) {
+            const rayonMin = this.calculateur.calculerRayonMinimum(diametre);
+            rayonMinInfo.textContent = `${rayonMin.toFixed(1)} mm`;
+            rayonMinInfo.style.color = '#0D47A1';
+            rayonMinInfo.style.fontWeight = 'bold';
+        } else if (rayonMinInfo) {
+            rayonMinInfo.textContent = '-';
+        }
+    }
+
+    /**
+     * Gère le changement de tube standard sélectionné
+     * @param {string} value - Valeur du sélecteur (index du tube ou vide pour personnalisé)
+     */
+    onTubeStandardChange(value) {
+        if (value === '' || value === null) {
+            // Mode personnalisé - ne rien faire
+            this.setStatus('Mode personnalisé activé');
+            return;
+        }
+
+        try {
+            const index = parseInt(value);
+            const tubes = this.bibliothequeTubes.getTousTubes();
+            const tube = tubes[index];
+
+            if (tube) {
+                // Remplir les champs avec les valeurs du tube standard
+                document.getElementById('tube-diametre').value = tube.diametreExterieur;
+                document.getElementById('tube-epaisseur').value = tube.epaisseur;
+                document.getElementById('cintrage-rayon').value = tube.rayonCintrageRecommande;
+
+                // Mettre à jour le rayon minimum
+                this.mettreAJourRayonMinimum();
+
+                this.setStatus(`Tube standard sélectionné : ${tube.designation}`);
+            }
+        } catch (e) {
+            console.error('Erreur lors de la sélection du tube standard:', e);
+        }
+    }
+
+    /**
+     * Gère le changement de matériau sélectionné
+     * @param {string} materiauId - ID du matériau
+     */
+    onMateriauChange(materiauId) {
+        const materiau = this.bibliothequeMateriaux.getMateriau(materiauId);
+
+        if (materiau) {
+            this.calculateur.setMateriau(materiau);
+            this.mettreAJourRayonMinimum(); // Le facteur peut changer
+            this.setStatus(`Matériau sélectionné : ${materiau.nom}`);
+
+            // Afficher une info sur le matériau
+            if (materiau.description) {
+                setTimeout(() => {
+                    this.setStatus(materiau.description);
+                }, 1500);
+            }
+        }
+    }
+
     /**
      * Affiche une erreur d'interface
      * @param {string} message - Message d'erreur
@@ -175,6 +307,30 @@ window.Interface = class Interface {
                 });
             } else {
                 console.error('Élément btn-reinitialiser non trouvé');
+            }
+
+            // Gestionnaire pour le changement de tube standard
+            const selectTubeStandard = document.getElementById('tube-standard');
+            if (selectTubeStandard) {
+                selectTubeStandard.addEventListener('change', (e) => {
+                    this.onTubeStandardChange(e.target.value);
+                });
+            }
+
+            // Gestionnaire pour le changement de matériau
+            const selectMateriau = document.getElementById('tube-materiau');
+            if (selectMateriau) {
+                selectMateriau.addEventListener('change', (e) => {
+                    this.onMateriauChange(e.target.value);
+                });
+            }
+
+            // Gestionnaire pour le changement de diamètre (met à jour le rayon min)
+            const inputDiametre = document.getElementById('tube-diametre');
+            if (inputDiametre) {
+                inputDiametre.addEventListener('input', () => {
+                    this.mettreAJourRayonMinimum();
+                });
             }
 
             // Gestion des tooltips
@@ -370,15 +526,40 @@ window.Interface = class Interface {
             const position = parseFloat(document.getElementById('cintrage-position').value);
             const angle = parseFloat(document.getElementById('cintrage-angle').value);
             const rayon = parseFloat(document.getElementById('cintrage-rayon').value);
-            
+
             if (isNaN(position) || isNaN(angle) || isNaN(rayon)) {
                 throw new Error('Veuillez entrer des valeurs numériques valides');
             }
-            
+
+            // Récupérer les paramètres du tube pour validation
+            const diametre = parseFloat(document.getElementById('tube-diametre').value);
+            const epaisseur = parseFloat(document.getElementById('tube-epaisseur').value);
+            const longueur = parseFloat(document.getElementById('tube-longueur').value);
+
+            if (isNaN(diametre) || isNaN(epaisseur) || isNaN(longueur)) {
+                throw new Error('Veuillez d\'abord définir les paramètres du tube');
+            }
+
+            const paramsTube = new ParametresTube(diametre, epaisseur, longueur);
             const paramsCintrage = new ParametresCintrage(angle, rayon, position);
+
+            // Valider le cintrage
+            const validation = this.calculateur.validerCintrage(paramsTube, paramsCintrage);
+
+            if (!validation.valide) {
+                const messages = validation.erreurs.join('\n');
+                throw new Error(messages);
+            }
+
+            // Afficher les avertissements s'il y en a
+            if (validation.avertissements.length > 0) {
+                const messages = validation.avertissements.join('\n');
+                this.showModal('Avertissement', messages + '\n\nLe cintrage a été ajouté mais vérifiez ces points.');
+            }
+
             this.calculateur.multiCintrage.ajouterCintrage(paramsCintrage);
             this.mettreAJourListeCintrages();
-            
+
             this.setStatus('Cintrage ajouté');
         } catch (e) {
             console.error('Erreur lors de l\'ajout d\'un cintrage:', e);
@@ -432,14 +613,10 @@ window.Interface = class Interface {
             this.calculateur.multiCintrage.cintrages.forEach((cintrage, i) => {
                 const angleReel = this.calculateur.calculerRetourElastique(cintrage.angle);
                 const valeurA = this.calculateur.calculerValeurA(cintrage.rayon, cintrage.angle);
-                
+
                 info += `#${i+1}: pos=${cintrage.position.toFixed(0)}, `;
                 info += `angle=${angleReel.toFixed(1)}°`;
-                
-                if (Math.abs(cintrage.angle - 90) < 0.1) {
-                    info += `, A=${valeurA.toFixed(1)}mm`;
-                }
-                
+                info += `, A=${valeurA.toFixed(1)}mm`;
                 info += "\n";
             });
             
