@@ -189,6 +189,15 @@ input[type="number"] {
     width: 100%;
 }
 
+select {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: var(--border-radius);
+    width: 100%;
+    background-color: white;
+    cursor: pointer;
+}
+
 /* Boutons */
 .buttons-container {
     display: flex;
