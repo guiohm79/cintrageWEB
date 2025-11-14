@@ -17,6 +17,7 @@ window.Interface = class Interface {
             this.bibliothequeTubes = new BibliothequeTubes();
             this.gestionnaireProjets = new GestionnaireProjets();
             this.historique = new GestionnaireHistorique(50);
+            this.bibliothequeTemplates = new BibliothequeTemplates();
 
             // Récupération des éléments DOM
             this.canvas = document.getElementById('visualization-canvas');
@@ -276,7 +277,19 @@ window.Interface = class Interface {
                     this.importerProjetJSON();
                 });
             }
-            
+
+            // Boutons du menu Templates
+            const templateIds = ['u', 'z', 's', 'coude', 'angle_droit', 'escalier', 'courbe', 'boucle'];
+            templateIds.forEach(id => {
+                const btn = document.getElementById(`template-${id}`);
+                if (btn) {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.appliquerTemplate(id);
+                    });
+                }
+            });
+
             const btnExporterDXF = document.getElementById('exporter-dxf');
             if (btnExporterDXF) {
                 btnExporterDXF.addEventListener('click', (e) => {
@@ -1261,6 +1274,71 @@ window.Interface = class Interface {
                 fileInput.value = '';
             }
         };
+    }
+
+    /**
+     * Applique un template de forme
+     * @param {string} templateId - ID du template à appliquer
+     */
+    appliquerTemplate(templateId) {
+        try {
+            const template = this.bibliothequeTemplates.getTemplate(templateId);
+
+            if (!template) {
+                throw new Error(`Template "${templateId}" non trouvé`);
+            }
+
+            // Demander confirmation si il y a déjà des cintrages
+            if (this.calculateur.multiCintrage.cintrages.length > 0) {
+                if (!confirm(`Appliquer le template "${template.nom}" va effacer les cintrages actuels. Continuer ?`)) {
+                    return;
+                }
+            }
+
+            // Réinitialiser les cintrages
+            this.calculateur.multiCintrage.cintrages = [];
+
+            // Générer les cintrages du template avec paramètres par défaut
+            const cintrages = this.bibliothequeTemplates.appliquerTemplate(templateId);
+
+            // Récupérer les paramètres du tube pour validation
+            const diametre = parseFloat(document.getElementById('tube-diametre').value);
+            const epaisseur = parseFloat(document.getElementById('tube-epaisseur').value);
+            const longueur = parseFloat(document.getElementById('tube-longueur').value);
+            const paramsTube = new ParametresTube(diametre, epaisseur, longueur);
+
+            // Vérifier la longueur du tube
+            const positionMax = Math.max(...cintrages.map(c => c.position));
+            if (positionMax > longueur) {
+                // Ajuster automatiquement la longueur du tube
+                document.getElementById('tube-longueur').value = Math.ceil(positionMax * 1.2);
+                this.showModal('Information', `La longueur du tube a été ajustée à ${Math.ceil(positionMax * 1.2)}mm pour accueillir le template.`);
+            }
+
+            // Ajouter tous les cintrages
+            cintrages.forEach(c => {
+                const paramsCintrage = new ParametresCintrage(c.angle, c.rayon, c.position);
+                try {
+                    this.calculateur.multiCintrage.ajouterCintrage(paramsCintrage);
+                } catch (e) {
+                    console.error('Erreur lors de l\'ajout du cintrage du template:', e);
+                }
+            });
+
+            // Réinitialiser l'historique
+            this.historique.reinitialiser();
+
+            this.mettreAJourListeCintrages();
+            this.setStatus(`Template "${template.nom}" appliqué (${cintrages.length} cintrages)`);
+
+            // Simuler automatiquement pour visualiser
+            setTimeout(() => {
+                this.simulerCintrage();
+            }, 200);
+        } catch (e) {
+            console.error('Erreur lors de l\'application du template:', e);
+            this.showModal('Erreur', `Erreur lors de l'application du template : ${e.message}`);
+        }
     }
 
     /**
