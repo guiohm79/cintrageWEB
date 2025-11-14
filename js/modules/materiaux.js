@@ -37,15 +37,15 @@ window.BibliothequeMateriaux = class BibliothequeMateriaux {
         materiaux.set('acier', new Materiau(
             'Acier doux',
             0.975,  // Retour élastique modéré
-            20,     // Rayon min = 20× diamètre
-            'Acier au carbone standard, bon compromis entre résistance et facilité de cintrage'
+            3,      // Rayon min = 3× diamètre (standard VIRAX réel)
+            'Acier au carbone standard, bon compromis entre résistance et facilité de cintrage. Facteur basé sur tableaux VIRAX.'
         ));
 
         // Inox 304
         materiaux.set('inox304', new Materiau(
             'Inox 304',
             0.965,  // Retour élastique plus important
-            22,     // Rayon min = 22× diamètre
+            5,      // Rayon min = 5× diamètre (plus rigide)
             'Acier inoxydable austénitique, résistant à la corrosion, plus difficile à cintrer'
         ));
 
@@ -53,7 +53,7 @@ window.BibliothequeMateriaux = class BibliothequeMateriaux {
         materiaux.set('inox316', new Materiau(
             'Inox 316',
             0.960,  // Retour élastique encore plus important
-            24,     // Rayon min = 24× diamètre
+            6,      // Rayon min = 6× diamètre (très rigide)
             'Acier inoxydable avec molybdène, excellente résistance à la corrosion, cintrage délicat'
         ));
 
@@ -61,15 +61,15 @@ window.BibliothequeMateriaux = class BibliothequeMateriaux {
         materiaux.set('cuivre', new Materiau(
             'Cuivre',
             0.985,  // Faible retour élastique
-            20,     // Rayon min = 20× diamètre (contrainte VIRAX)
-            'Métal ductile, facile à cintrer, faible retour élastique. Note: VIRAX recommande machines spécifiques pour cuivre'
+            3,      // Rayon min = 3× diamètre (très ductile)
+            'Métal ductile, facile à cintrer, faible retour élastique. Cintreuse cuivre 16mm ≈ rayon 60mm.'
         ));
 
         // Aluminium
         materiaux.set('aluminium', new Materiau(
             'Aluminium',
             0.980,  // Retour élastique faible
-            20,     // Rayon min = 20× diamètre (contrainte VIRAX)
+            3.5,    // Rayon min = 3.5× diamètre
             'Léger et ductile, attention aux risques de fissuration sur rayons serrés'
         ));
 
@@ -77,7 +77,7 @@ window.BibliothequeMateriaux = class BibliothequeMateriaux {
         materiaux.set('laiton', new Materiau(
             'Laiton',
             0.982,  // Retour élastique faible
-            20,     // Rayon min = 20× diamètre (contrainte VIRAX)
+            3.5,    // Rayon min = 3.5× diamètre
             'Alliage cuivre-zinc, bonne ductilité, cintrage facile'
         ));
 
@@ -85,15 +85,15 @@ window.BibliothequeMateriaux = class BibliothequeMateriaux {
         materiaux.set('per', new Materiau(
             'PER',
             0.995,  // Très faible retour élastique
-            20,     // Rayon min = 20× diamètre (contrainte VIRAX - non recommandé)
-            'Tube plastique, très flexible, retour élastique négligeable. ATTENTION: VIRAX conçu pour acier/fer uniquement'
+            3,      // Rayon min = 3× diamètre (très flexible)
+            'Tube plastique, très flexible, retour élastique négligeable. Note: utiliser cintreuse spécifique PER.'
         ));
 
         // Acier galvanisé
         materiaux.set('acier_galva', new Materiau(
             'Acier galvanisé',
             0.970,  // Retour élastique modéré
-            21,     // Rayon min = 21× diamètre
+            4,      // Rayon min = 4× diamètre (un peu plus rigide)
             'Acier avec revêtement zinc, protection contre la corrosion'
         ));
 
