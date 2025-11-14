@@ -2056,17 +2056,67 @@ window.Interface = class Interface {
         const longueur = parseFloat(document.getElementById('tube-longueur').value);
         const echelle = this.canvas.width / longueur;
 
+        // Calculer l'angle initial du tube à la position posMin
+        // en tenant compte de tous les cintrages AVANT ce point
+        let angleInitial = 0;
+        const cintragesAvant = this.calculateur.multiCintrage.cintrages.filter(
+            c => c.position < posMin
+        ).sort((a, b) => a.position - b.position);
+
+        cintragesAvant.forEach(cintrage => {
+            angleInitial += cintrage.angle * Math.PI / 180;
+        });
+
+        // Calculer la position X,Y réelle du point de départ
+        // en suivant le tracé du tube depuis le début
+        let xDepart = 0;
+        let yDepart = this.canvas.height / 2;
+        let angleActuel = 0;
+        let posActuelle = 0;
+
+        const tousCintrages = this.calculateur.multiCintrage.cintrages.sort((a, b) => a.position - b.position);
+
+        for (const cintrage of tousCintrages) {
+            if (cintrage.position >= posMin) break;
+
+            // Segment droit jusqu'au cintrage
+            const dist = cintrage.position - posActuelle;
+            xDepart += dist * echelle * Math.cos(angleActuel);
+            yDepart += dist * echelle * Math.sin(angleActuel);
+
+            // Appliquer le cintrage
+            const angleRad = cintrage.angle * Math.PI / 180;
+            const rayon = cintrage.rayon * echelle;
+
+            // Centre du cercle
+            const centreX = xDepart + rayon * Math.cos(angleActuel + Math.PI / 2 * Math.sign(angleRad));
+            const centreY = yDepart + rayon * Math.sin(angleActuel + Math.PI / 2 * Math.sign(angleRad));
+
+            // Fin de l'arc
+            const angleArcFinal = angleActuel + Math.PI / 2 * Math.sign(angleRad) + Math.PI + angleRad;
+            xDepart = centreX + rayon * Math.cos(angleArcFinal);
+            yDepart = centreY + rayon * Math.sin(angleArcFinal);
+
+            angleActuel += angleRad;
+            posActuelle = cintrage.position;
+        }
+
+        // Segment final jusqu'à posMin
+        const distFinale = posMin - posActuelle;
+        xDepart += distFinale * echelle * Math.cos(angleActuel);
+        yDepart += distFinale * echelle * Math.sin(angleActuel);
+
         // Récupérer les cintrages entre les deux points
         const cintragesEntrePoints = this.calculateur.multiCintrage.cintrages.filter(
             c => c.position >= posMin && c.position <= posMax
         ).sort((a, b) => a.position - b.position);
 
-        // Calculer les points du tracé
+        // Calculer les points du tracé depuis posMin avec l'angle initial correct
         const points = [];
         let positionCourante = posMin;
-        let x = posMin * echelle;
-        let y = this.canvas.height / 2;
-        let angle = 0; // Angle actuel du tube (en radians)
+        let x = xDepart;
+        let y = yDepart;
+        let angle = angleInitial;
 
         points.push({ x, y });
 
@@ -2219,7 +2269,13 @@ window.Interface = class Interface {
             return;
         }
 
-        const rayon = prompt(`Entrez le rayon de cintrage (en mm):`, '50');
+        // Calculer le rayon recommandé basé sur le matériau et le diamètre
+        const materiauId = document.getElementById('tube-materiau').value;
+        const materiau = this.bibliothequeMateriaux.getMateriau(materiauId);
+        const diametre = parseFloat(document.getElementById('tube-diametre').value);
+        const rayonRecommande = Math.round(materiau.facteurRayonMin * diametre);
+
+        const rayon = prompt(`Entrez le rayon de cintrage (en mm):\n(Rayon recommandé pour ${materiau.nom}: ${rayonRecommande}mm)`, rayonRecommande.toString());
         if (rayon === null) return;
 
         const rayonNum = parseFloat(rayon);
