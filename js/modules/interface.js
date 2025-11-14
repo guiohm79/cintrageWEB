@@ -2038,7 +2038,7 @@ window.Interface = class Interface {
     }
 
     /**
-     * Dessine une règle de mesure entre deux points
+     * Dessine une règle de mesure qui suit le tracé du tube entre deux points
      * @param {number} x1 - Position X du point de départ
      * @param {number} pos1 - Position en mm du point de départ
      * @param {number} x2 - Position X du point d'arrivée
@@ -2047,16 +2047,75 @@ window.Interface = class Interface {
     dessinerRegleMesure(x1, pos1, x2, pos2) {
         if (!this.modeEdition) return;
 
-        const y = this.canvas.height / 2;
-        const distance = Math.abs(pos2 - pos1);
+        // S'assurer que pos1 < pos2
+        const posMin = Math.min(pos1, pos2);
+        const posMax = Math.max(pos1, pos2);
 
-        // Ligne horizontale entre les 2 points
+        // Calculer la trajectoire du tube entre les deux points
+        const diametre = parseFloat(document.getElementById('tube-diametre').value);
+        const longueur = parseFloat(document.getElementById('tube-longueur').value);
+        const echelle = this.canvas.width / longueur;
+
+        // Récupérer les cintrages entre les deux points
+        const cintragesEntrePoints = this.calculateur.multiCintrage.cintrages.filter(
+            c => c.position >= posMin && c.position <= posMax
+        ).sort((a, b) => a.position - b.position);
+
+        // Calculer les points du tracé
+        const points = [];
+        let positionCourante = posMin;
+        let x = posMin * echelle;
+        let y = this.canvas.height / 2;
+        let angle = 0; // Angle actuel du tube (en radians)
+
+        points.push({ x, y });
+
+        // Pour chaque cintrage dans la zone
+        cintragesEntrePoints.forEach(cintrage => {
+            // Segment droit jusqu'au cintrage
+            const distanceDroit = cintrage.position - positionCourante;
+            x += distanceDroit * echelle * Math.cos(angle);
+            y += distanceDroit * echelle * Math.sin(angle);
+            points.push({ x, y });
+
+            // Arc du cintrage
+            const angleRad = cintrage.angle * Math.PI / 180;
+            const rayon = cintrage.rayon * echelle;
+
+            // Centre du cercle
+            const centreX = x + rayon * Math.cos(angle + Math.PI / 2 * Math.sign(angleRad));
+            const centreY = y + rayon * Math.sin(angle + Math.PI / 2 * Math.sign(angleRad));
+
+            // Points le long de l'arc
+            const nbPointsArc = Math.max(5, Math.floor(Math.abs(angleRad) * 10));
+            for (let i = 1; i <= nbPointsArc; i++) {
+                const progression = i / nbPointsArc;
+                const angleArc = angle + Math.PI / 2 * Math.sign(angleRad) + Math.PI + angleRad * progression;
+                const px = centreX + rayon * Math.cos(angleArc);
+                const py = centreY + rayon * Math.sin(angleArc);
+                points.push({ x: px, y: py });
+            }
+
+            // Mettre à jour position et angle
+            positionCourante = cintrage.position;
+            angle += angleRad;
+        });
+
+        // Segment droit final jusqu'à posMax
+        const distanceFinale = posMax - positionCourante;
+        x += distanceFinale * echelle * Math.cos(angle);
+        y += distanceFinale * echelle * Math.sin(angle);
+        points.push({ x, y });
+
+        // Dessiner la règle le long du tracé
         this.ctx.strokeStyle = '#FF5722';
         this.ctx.lineWidth = 3;
         this.ctx.setLineDash([10, 5]);
         this.ctx.beginPath();
-        this.ctx.moveTo(x1, y);
-        this.ctx.lineTo(x2, y);
+        this.ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+            this.ctx.lineTo(points[i].x, points[i].y);
+        }
         this.ctx.stroke();
         this.ctx.setLineDash([]);
 
@@ -2065,20 +2124,26 @@ window.Interface = class Interface {
         this.ctx.lineWidth = 2;
 
         // Trait au point de départ
+        const p1 = points[0];
         this.ctx.beginPath();
-        this.ctx.moveTo(x1, y - 30);
-        this.ctx.lineTo(x1, y + 30);
+        this.ctx.moveTo(p1.x, p1.y - 30);
+        this.ctx.lineTo(p1.x, p1.y + 30);
         this.ctx.stroke();
 
         // Trait au point d'arrivée
+        const p2 = points[points.length - 1];
         this.ctx.beginPath();
-        this.ctx.moveTo(x2, y - 30);
-        this.ctx.lineTo(x2, y + 30);
+        this.ctx.moveTo(p2.x, p2.y - 30);
+        this.ctx.lineTo(p2.x, p2.y + 30);
         this.ctx.stroke();
 
-        // Label avec la distance au milieu
-        const midX = (x1 + x2) / 2;
-        const label = `${Math.round(distance)} mm`;
+        // Calculer la longueur développée réelle
+        const longueurDeveloppee = this.calculerLongueurDeveloppeeSectionne(posMin, posMax);
+
+        // Label avec la distance au milieu du tracé
+        const midIndex = Math.floor(points.length / 2);
+        const midPoint = points[midIndex];
+        const label = `${Math.round(longueurDeveloppee)} mm`;
         const padding = 8;
 
         this.ctx.font = 'bold 14px Arial';
@@ -2086,23 +2151,56 @@ window.Interface = class Interface {
 
         // Fond du label
         this.ctx.fillStyle = '#FF5722';
-        this.ctx.fillRect(midX - textWidth / 2 - padding, y - 50, textWidth + padding * 2, 26);
+        this.ctx.fillRect(midPoint.x - textWidth / 2 - padding, midPoint.y - 50, textWidth + padding * 2, 26);
 
         // Texte
         this.ctx.fillStyle = '#FFFFFF';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        this.ctx.fillText(label, midX, y - 37);
+        this.ctx.fillText(label, midPoint.x, midPoint.y - 37);
 
         // Labels pour les positions aux extrémités
         this.ctx.font = '11px Arial';
         this.ctx.fillStyle = '#666';
 
         // Position départ
-        this.ctx.fillText(`${Math.round(pos1)}mm`, x1, y + 45);
+        this.ctx.fillText(`${Math.round(posMin)}mm`, p1.x, p1.y + 45);
 
         // Position arrivée
-        this.ctx.fillText(`${Math.round(pos2)}mm`, x2, y + 45);
+        this.ctx.fillText(`${Math.round(posMax)}mm`, p2.x, p2.y + 45);
+    }
+
+    /**
+     * Calcule la longueur développée d'une section du tube
+     * @param {number} posMin - Position de début (mm)
+     * @param {number} posMax - Position de fin (mm)
+     * @returns {number} Longueur développée en mm
+     */
+    calculerLongueurDeveloppeeSectionne(posMin, posMax) {
+        let longueur = 0;
+        let positionCourante = posMin;
+
+        // Cintrages dans la zone
+        const cintrages = this.calculateur.multiCintrage.cintrages.filter(
+            c => c.position >= posMin && c.position <= posMax
+        ).sort((a, b) => a.position - b.position);
+
+        cintrages.forEach(cintrage => {
+            // Longueur droite jusqu'au cintrage
+            longueur += cintrage.position - positionCourante;
+
+            // Longueur de l'arc
+            const angleRad = Math.abs(cintrage.angle) * Math.PI / 180;
+            const longueurArc = cintrage.rayon * angleRad;
+            longueur += longueurArc;
+
+            positionCourante = cintrage.position;
+        });
+
+        // Longueur droite finale
+        longueur += posMax - positionCourante;
+
+        return longueur;
     }
 
     /**
