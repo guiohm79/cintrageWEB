@@ -41,6 +41,11 @@ window.Interface = class Interface {
             this.triColonne = null; // Colonne actuellement triée
             this.triOrdre = 'asc'; // 'asc' ou 'desc'
 
+            // Visualisation 3D
+            this.visualization3D = null;
+            this.vueActive = '2d'; // '2d' ou '3d'
+            this.initialiserVisualization3D();
+
             // Peupler les sélecteurs
             this.initialiserSelecteurs();
 
@@ -70,6 +75,60 @@ window.Interface = class Interface {
             console.error('Erreur lors de l\'initialisation de l\'interface:', error);
             this.afficherErreurInterface(error.message);
         }
+    }
+
+    /**
+     * Initialise la visualisation 3D
+     */
+    initialiserVisualization3D() {
+        try {
+            if (typeof Visualization3D !== 'undefined') {
+                this.visualization3D = new Visualization3D('canvas-3d');
+                console.log('Visualisation 3D initialisée');
+            } else {
+                console.warn('Visualization3D non disponible');
+            }
+        } catch (error) {
+            console.error('Erreur lors de l\'initialisation de la visualisation 3D:', error);
+        }
+    }
+
+    /**
+     * Bascule entre les vues 2D et 3D
+     * @param {string} vue - 'view-2d' ou 'view-3d'
+     */
+    basculerVue(vue) {
+        this.vueActive = vue;
+
+        // Gérer les onglets
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.view-container').forEach(container => container.classList.remove('active'));
+
+        if (vue === '2d') {
+            document.getElementById('tab-2d').classList.add('active');
+            document.getElementById('view-2d').classList.add('active');
+        } else {
+            document.getElementById('tab-3d').classList.add('active');
+            document.getElementById('view-3d').classList.add('active');
+
+            // Mettre à jour la vue 3D
+            this.mettreAJourVue3D();
+        }
+
+        this.setStatus(`Vue ${vue.toUpperCase()} activée`);
+    }
+
+    /**
+     * Met à jour la visualisation 3D avec les cintrages actuels
+     */
+    mettreAJourVue3D() {
+        if (!this.visualization3D) return;
+
+        const diametre = parseFloat(document.getElementById('tube-diametre').value);
+        const longueur = parseFloat(document.getElementById('tube-longueur').value);
+        const cintrages = this.calculateur.multiCintrage.cintrages;
+
+        this.visualization3D.afficherTube(cintrages, diametre, longueur);
     }
 
     /**
@@ -390,6 +449,32 @@ window.Interface = class Interface {
             if (inputDiametre) {
                 inputDiametre.addEventListener('input', () => {
                     this.mettreAJourRayonMinimum();
+                });
+            }
+
+            // Onglets 2D/3D
+            const tab2D = document.getElementById('tab-2d');
+            if (tab2D) {
+                tab2D.addEventListener('click', () => {
+                    this.basculerVue('2d');
+                });
+            }
+
+            const tab3D = document.getElementById('tab-3d');
+            if (tab3D) {
+                tab3D.addEventListener('click', () => {
+                    this.basculerVue('3d');
+                });
+            }
+
+            // Bouton reset caméra 3D
+            const btnResetCamera = document.getElementById('btn-3d-reset');
+            if (btnResetCamera) {
+                btnResetCamera.addEventListener('click', () => {
+                    if (this.visualization3D) {
+                        this.visualization3D.reinitialiserCamera();
+                        this.setStatus('Caméra 3D réinitialisée');
+                    }
                 });
             }
 
@@ -824,7 +909,12 @@ window.Interface = class Interface {
             if (this.cintragesInfo) {
                 this.cintragesInfo.textContent = info;
             }
-            
+
+            // Mettre à jour la vue 3D
+            if (this.vueActive === '3d') {
+                this.mettreAJourVue3D();
+            }
+
             this.setStatus('Simulation terminée');
         } catch (e) {
             console.error('Erreur lors de la simulation:', e);
