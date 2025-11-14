@@ -37,6 +37,10 @@ window.Interface = class Interface {
             this.selectedCintrageIndex = -1;
             this.autosaveTimer = null;
 
+            // Paramètres de tri de la table
+            this.triColonne = null; // Colonne actuellement triée
+            this.triOrdre = 'asc'; // 'asc' ou 'desc'
+
             // Peupler les sélecteurs
             this.initialiserSelecteurs();
 
@@ -427,32 +431,19 @@ window.Interface = class Interface {
                 }
             });
             
-            // Gestion de la sélection dans la table des cintrages
+            // Gestion du tri de la table des cintrages
             try {
-                const cintragesTree = document.getElementById('cintrages-tree');
-                if (cintragesTree) {
-                    cintragesTree.addEventListener('click', (e) => {
-                        console.log('Clic sur la table des cintrages');
-                        const tr = e.target.closest('tr');
-                        if (tr && tr.parentNode === cintragesTree.querySelector('tbody')) {
-                            // Enlever la sélection précédente
-                            const selectedRows = cintragesTree.querySelectorAll('tr.selected');
-                            selectedRows.forEach(row => row.classList.remove('selected'));
-                            
-                            // Ajouter la sélection actuelle
-                            tr.classList.add('selected');
-                            
-                            // Récupérer l'index
-                            const allRows = Array.from(cintragesTree.querySelectorAll('tbody tr'));
-                            this.selectedCintrageIndex = allRows.indexOf(tr);
-                            console.log('Cintrage sélectionné à l\'index', this.selectedCintrageIndex);
-                        }
+                const tableHeaders = document.querySelectorAll('#cintrages-tree th');
+                tableHeaders.forEach((th, index) => {
+                    th.addEventListener('click', () => {
+                        this.trierTable(index);
                     });
-                } else {
-                    console.error('Élément cintrages-tree non trouvé');
-                }
+                    // Initialiser les styles
+                    th.style.cursor = 'pointer';
+                    th.style.userSelect = 'none';
+                });
             } catch (e) {
-                console.error('Erreur lors de la configuration de la table des cintrages:', e);
+                console.error('Erreur lors de la configuration du tri de la table:', e);
             }
             
             // Raccourcis clavier globaux
@@ -612,22 +603,84 @@ window.Interface = class Interface {
             console.error('Élément tbody non trouvé');
             return;
         }
-        
+
         tbody.innerHTML = '';
-        
-        this.calculateur.multiCintrage.cintrages.forEach(cintrage => {
+
+        // Créer une copie des cintrages avec leurs indices
+        let cintragesToDisplay = this.calculateur.multiCintrage.cintrages.map((cintrage, index) => ({
+            index,
+            cintrage
+        }));
+
+        // Appliquer le tri si une colonne est sélectionnée
+        if (this.triColonne !== null) {
+            cintragesToDisplay.sort((a, b) => {
+                let valA, valB;
+
+                switch (this.triColonne) {
+                    case 0: // Position
+                        valA = a.cintrage.position;
+                        valB = b.cintrage.position;
+                        break;
+                    case 1: // Angle
+                        valA = a.cintrage.angle;
+                        valB = b.cintrage.angle;
+                        break;
+                    case 2: // Rayon
+                        valA = a.cintrage.rayon;
+                        valB = b.cintrage.rayon;
+                        break;
+                    case 3: // Valeur A
+                        valA = this.calculateur.calculerValeurA(a.cintrage.rayon, Math.abs(a.cintrage.angle));
+                        valB = this.calculateur.calculerValeurA(b.cintrage.rayon, Math.abs(b.cintrage.angle));
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (this.triOrdre === 'asc') {
+                    return valA - valB;
+                } else {
+                    return valB - valA;
+                }
+            });
+        }
+
+        cintragesToDisplay.forEach(({ index, cintrage }) => {
             // Calculer la valeur A pour tous les angles
             const valeurA = this.calculateur.calculerValeurA(cintrage.rayon, Math.abs(cintrage.angle)).toFixed(1);
-                
+
             const tr = document.createElement('tr');
+            tr.dataset.index = index; // Stocker l'index original
+
+            // Cellules éditables (position, angle, rayon)
             tr.innerHTML = `
-                <td>${cintrage.position.toFixed(1)}</td>
-                <td>${cintrage.angle.toFixed(1)}</td>
-                <td>${cintrage.rayon.toFixed(1)}</td>
-                <td>${valeurA}</td>
+                <td class="editable" data-field="position">${cintrage.position.toFixed(1)}</td>
+                <td class="editable" data-field="angle">${cintrage.angle.toFixed(1)}</td>
+                <td class="editable" data-field="rayon">${cintrage.rayon.toFixed(1)}</td>
+                <td class="readonly">${valeurA}</td>
             `;
+
+            // Ajouter l'événement de sélection
+            tr.addEventListener('click', () => {
+                // Retirer la sélection des autres lignes
+                tbody.querySelectorAll('tr').forEach(row => row.classList.remove('selected'));
+                tr.classList.add('selected');
+                this.selectedCintrageIndex = index;
+            });
+
+            // Ajouter l'événement de double-clic pour édition inline
+            tr.querySelectorAll('.editable').forEach(td => {
+                td.addEventListener('dblclick', (e) => {
+                    this.activerEditionInline(td, index);
+                });
+            });
+
             tbody.appendChild(tr);
         });
+
+        // Mettre à jour les indicateurs de tri dans les en-têtes
+        this.mettreAJourIndicateursTri();
     }
     
     /**
@@ -1483,6 +1536,158 @@ window.Interface = class Interface {
         } catch (e) {
             console.error('Erreur lors de la restauration de l\'autosave:', e);
         }
+    }
+
+    /**
+     * Active l'édition inline d'une cellule de la table
+     * @param {HTMLElement} td - La cellule à éditer
+     * @param {number} index - L'index du cintrage
+     */
+    activerEditionInline(td, index) {
+        // Empêcher l'édition si déjà en cours
+        if (td.querySelector('input')) {
+            return;
+        }
+
+        const field = td.dataset.field;
+        const valeurOriginale = parseFloat(td.textContent);
+
+        // Créer un input pour l'édition
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.value = valeurOriginale;
+        input.step = '0.1';
+        input.style.width = '100%';
+        input.style.border = '2px solid #0D47A1';
+        input.style.padding = '4px';
+
+        // Remplacer le contenu par l'input
+        td.textContent = '';
+        td.appendChild(input);
+        input.focus();
+        input.select();
+
+        // Fonction pour sauvegarder les changements
+        const sauvegarder = () => {
+            const nouvelleValeur = parseFloat(input.value);
+
+            if (isNaN(nouvelleValeur)) {
+                this.showModal('Erreur', 'Valeur invalide');
+                td.textContent = valeurOriginale.toFixed(1);
+                return;
+            }
+
+            // Vérifier si la valeur a changé
+            if (nouvelleValeur === valeurOriginale) {
+                td.textContent = valeurOriginale.toFixed(1);
+                return;
+            }
+
+            try {
+                // Capturer l'état avant
+                const avant = {
+                    cintrages: this.calculateur.multiCintrage.cintrages.map(c => ({...c}))
+                };
+
+                // Mettre à jour le cintrage
+                const cintrage = this.calculateur.multiCintrage.cintrages[index];
+                cintrage[field] = nouvelleValeur;
+
+                // Valider le cintrage modifié
+                const diametre = parseFloat(document.getElementById('tube-diametre').value);
+                const epaisseur = parseFloat(document.getElementById('tube-epaisseur').value);
+                const longueur = parseFloat(document.getElementById('tube-longueur').value);
+                const paramsTube = new ParametresTube(diametre, epaisseur, longueur);
+                const paramsCintrage = new ParametresCintrage(cintrage.angle, cintrage.rayon, cintrage.position);
+
+                const validation = this.calculateur.validerCintrage(paramsTube, paramsCintrage);
+
+                if (!validation.valide) {
+                    // Restaurer la valeur originale
+                    cintrage[field] = valeurOriginale;
+                    this.showModal('Erreur', validation.erreurs.join('\n'));
+                    td.textContent = valeurOriginale.toFixed(1);
+                    return;
+                }
+
+                // Afficher les avertissements s'il y en a
+                if (validation.avertissements.length > 0) {
+                    this.showModal('Avertissement', validation.avertissements.join('\n'));
+                }
+
+                // Capturer l'état après
+                const apres = {
+                    cintrages: this.calculateur.multiCintrage.cintrages.map(c => ({...c}))
+                };
+
+                // Enregistrer dans l'historique
+                const action = new ActionHistorique('modifier_cintrage', avant, apres);
+                this.historique.ajouterAction(action);
+
+                // Mettre à jour l'affichage
+                this.mettreAJourListeCintrages();
+                this.setStatus(`Cintrage #${index + 1} modifié: ${field} = ${nouvelleValeur.toFixed(1)}`);
+
+            } catch (e) {
+                console.error('Erreur lors de la modification:', e);
+                td.textContent = valeurOriginale.toFixed(1);
+                this.showModal('Erreur', e.message);
+            }
+        };
+
+        // Sauvegarder sur Enter ou perte de focus
+        input.addEventListener('blur', sauvegarder);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                sauvegarder();
+            } else if (e.key === 'Escape') {
+                td.textContent = valeurOriginale.toFixed(1);
+            }
+        });
+    }
+
+    /**
+     * Trie la table par une colonne donnée
+     * @param {number} colonne - Index de la colonne (0=Position, 1=Angle, 2=Rayon, 3=Valeur A)
+     */
+    trierTable(colonne) {
+        if (this.triColonne === colonne) {
+            // Inverser l'ordre si on clique sur la même colonne
+            this.triOrdre = this.triOrdre === 'asc' ? 'desc' : 'asc';
+        } else {
+            // Nouvelle colonne, tri ascendant par défaut
+            this.triColonne = colonne;
+            this.triOrdre = 'asc';
+        }
+
+        this.mettreAJourListeCintrages();
+        this.setStatus(`Tri par ${['Position', 'Angle', 'Rayon', 'Valeur A'][colonne]} (${this.triOrdre === 'asc' ? 'croissant' : 'décroissant'})`);
+    }
+
+    /**
+     * Met à jour les indicateurs de tri dans les en-têtes de table
+     */
+    mettreAJourIndicateursTri() {
+        const headers = document.querySelectorAll('#cintrages-tree th');
+
+        headers.forEach((th, index) => {
+            // Retirer les anciennes flèches
+            th.innerHTML = th.textContent.replace(' ▲', '').replace(' ▼', '');
+
+            // Ajouter la flèche si c'est la colonne triée
+            if (this.triColonne === index) {
+                th.innerHTML += this.triOrdre === 'asc' ? ' ▲' : ' ▼';
+                th.style.fontWeight = 'bold';
+                th.style.color = '#0D47A1';
+            } else {
+                th.style.fontWeight = 'normal';
+                th.style.color = '';
+            }
+
+            // Ajouter un curseur pointer pour indiquer que c'est cliquable
+            th.style.cursor = 'pointer';
+            th.style.userSelect = 'none';
+        });
     }
 };
 
