@@ -49,7 +49,7 @@ window.Interface = class Interface {
             // Mode édition visuelle
             this.modeEdition = false;
             this.cintrageEnDrag = null;
-            this.offsetDrag = { x: 0, y: 0 };
+            this.pointSurvol = null; // Position de la souris en mode édition
             this.poignees = []; // Position des poignées de cintrage
 
             // Peupler les sélecteurs
@@ -1813,18 +1813,23 @@ window.Interface = class Interface {
         if (btn) {
             if (this.modeEdition) {
                 btn.classList.add('active');
-                this.setStatus('Mode édition activé - Glissez les points de cintrage');
+                this.setStatus('Mode édition: Cliquez sur le tube pour ajouter un point de cintrage');
                 this.canvas.style.cursor = 'crosshair';
             } else {
                 btn.classList.remove('active');
                 this.setStatus('Mode édition désactivé');
                 this.canvas.style.cursor = 'default';
                 this.cintrageEnDrag = null;
+                this.pointSurvol = null;
             }
         }
 
-        // Redessiner pour afficher/masquer les poignées
-        this.simulerCintrage();
+        // Redessiner pour afficher/masquer la règle et les poignées
+        if (this.calculateur.multiCintrage.cintrages.length > 0) {
+            this.simulerCintrage();
+        } else {
+            this.dessinerRegleGraduee();
+        }
     }
 
     /**
@@ -1837,7 +1842,7 @@ window.Interface = class Interface {
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        // Vérifier si on clique sur une poignée
+        // Vérifier si on clique sur une poignée existante (pour drag)
         for (let i = 0; i < this.poignees.length; i++) {
             const poignee = this.poignees[i];
             const distance = Math.sqrt(
@@ -1845,8 +1850,8 @@ window.Interface = class Interface {
                 Math.pow(mouseY - poignee.y, 2)
             );
 
-            if (distance < 10) {
-                // On a cliqué sur cette poignée
+            if (distance < 15) {
+                // On a cliqué sur cette poignée - mode drag
                 this.cintrageEnDrag = {
                     index: i,
                     startX: mouseX,
@@ -1857,6 +1862,20 @@ window.Interface = class Interface {
                 return;
             }
         }
+
+        // Sinon, on ajoute un nouveau point de cintrage
+        const longueur = parseFloat(document.getElementById('tube-longueur').value);
+        const echelle = this.canvas.width / longueur;
+        const position = mouseX / echelle;
+
+        // Vérifier que la position est valide (dans le tube)
+        if (position < 10 || position > longueur - 10) {
+            this.showModal('Position invalide', 'Le point de cintrage doit être entre 10mm et ' + (longueur - 10) + 'mm');
+            return;
+        }
+
+        // Demander angle et rayon via prompt (temporaire, on améliorera avec un modal)
+        this.demanderParametresCintrage(position);
     }
 
     /**
@@ -1885,7 +1904,15 @@ window.Interface = class Interface {
             return;
         }
 
-        // Sinon, vérifier si on survole une poignée pour changer le curseur
+        // Calculer la position de la souris sur le tube
+        const longueur = parseFloat(document.getElementById('tube-longueur').value);
+        const echelle = this.canvas.width / longueur;
+        const position = mouseX / echelle;
+
+        // Enregistrer la position pour le dessin
+        this.pointSurvol = { x: mouseX, position: Math.round(position) };
+
+        // Vérifier si on survole une poignée existante
         let surPoignee = false;
         for (let poignee of this.poignees) {
             const distance = Math.sqrt(
@@ -1893,13 +1920,20 @@ window.Interface = class Interface {
                 Math.pow(mouseY - poignee.y, 2)
             );
 
-            if (distance < 10) {
+            if (distance < 15) {
                 surPoignee = true;
                 break;
             }
         }
 
         this.canvas.style.cursor = surPoignee ? 'grab' : 'crosshair';
+
+        // Redessiner pour afficher le curseur de position
+        if (this.calculateur.multiCintrage.cintrages.length > 0) {
+            this.simulerCintrage();
+        } else {
+            this.dessinerRegleGraduee();
+        }
     }
 
     /**
@@ -1928,7 +1962,7 @@ window.Interface = class Interface {
      * Dessine les poignées de cintrage en mode édition
      */
     dessinerPoignees() {
-        if (!this.modeEdition || !this.calculateur.multiCintrage.cintrages.length) {
+        if (!this.modeEdition) {
             this.poignees = [];
             return;
         }
@@ -1938,13 +1972,14 @@ window.Interface = class Interface {
 
         this.poignees = [];
 
+        // Dessiner les poignées des cintrages existants
         this.calculateur.multiCintrage.cintrages.forEach((cintrage, index) => {
             const x = cintrage.position * echelle;
             const y = this.canvas.height / 2;
 
             // Dessiner un cercle pour la poignée
             this.ctx.beginPath();
-            this.ctx.arc(x, y, 8, 0, 2 * Math.PI);
+            this.ctx.arc(x, y, 10, 0, 2 * Math.PI);
             this.ctx.fillStyle = '#FF5722';
             this.ctx.fill();
             this.ctx.strokeStyle = '#FFFFFF';
@@ -1961,6 +1996,154 @@ window.Interface = class Interface {
             // Enregistrer la position de la poignée
             this.poignees.push({ x, y, index });
         });
+
+        // Dessiner le curseur de position au survol
+        if (this.pointSurvol) {
+            this.dessinerCurseurPosition(this.pointSurvol.x, this.pointSurvol.position);
+        }
+
+        // Dessiner la règle graduée
+        this.dessinerRegleGraduee();
+    }
+
+    /**
+     * Dessine la règle graduée en bas du canvas
+     */
+    dessinerRegleGraduee() {
+        if (!this.modeEdition) return;
+
+        const longueur = parseFloat(document.getElementById('tube-longueur').value);
+        const echelle = this.canvas.width / longueur;
+        const y = this.canvas.height - 40;
+
+        // Ligne de base de la règle
+        this.ctx.strokeStyle = '#333';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, y);
+        this.ctx.lineTo(this.canvas.width, y);
+        this.ctx.stroke();
+
+        // Graduations tous les 50mm
+        this.ctx.font = '10px Arial';
+        this.ctx.fillStyle = '#333';
+        this.ctx.textAlign = 'center';
+
+        for (let position = 0; position <= longueur; position += 50) {
+            const x = position * echelle;
+
+            // Grande graduation tous les 100mm
+            if (position % 100 === 0) {
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.moveTo(x, y - 15);
+                this.ctx.lineTo(x, y + 15);
+                this.ctx.stroke();
+
+                // Label
+                this.ctx.fillText(`${position}`, x, y + 28);
+            } else {
+                // Petite graduation
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                this.ctx.moveTo(x, y - 8);
+                this.ctx.lineTo(x, y + 8);
+                this.ctx.stroke();
+            }
+        }
+
+        // Dessiner le curseur de position si on survole
+        if (this.pointSurvol) {
+            this.dessinerCurseurPosition(this.pointSurvol.x, this.pointSurvol.position);
+        }
+    }
+
+    /**
+     * Dessine un curseur vertical indiquant la position de la souris
+     */
+    dessinerCurseurPosition(x, position) {
+        // Ligne verticale
+        this.ctx.strokeStyle = '#2196F3';
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([5, 5]);
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, 0);
+        this.ctx.lineTo(x, this.canvas.height - 40);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+
+        // Label avec la position
+        const label = `${position} mm`;
+        const padding = 6;
+        const textWidth = this.ctx.measureText(label).width;
+
+        this.ctx.fillStyle = '#2196F3';
+        this.ctx.fillRect(x - textWidth / 2 - padding, 10, textWidth + padding * 2, 20);
+
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = 'bold 12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(label, x, 20);
+    }
+
+    /**
+     * Demande les paramètres du cintrage (angle et rayon) via dialog
+     */
+    demanderParametresCintrage(position) {
+        // Pour l'instant, utilisons des prompts simples
+        // TODO: Créer un vrai modal avec formulaire
+
+        const angle = prompt(`Entrez l'angle de cintrage (en degrés) pour la position ${Math.round(position)}mm:`, '90');
+        if (angle === null) return;
+
+        const angleNum = parseFloat(angle);
+        if (isNaN(angleNum) || angleNum === 0) {
+            this.showModal('Erreur', 'Veuillez entrer un angle valide (différent de 0)');
+            return;
+        }
+
+        const rayon = prompt(`Entrez le rayon de cintrage (en mm):`, '50');
+        if (rayon === null) return;
+
+        const rayonNum = parseFloat(rayon);
+        if (isNaN(rayonNum) || rayonNum <= 0) {
+            this.showModal('Erreur', 'Veuillez entrer un rayon valide (> 0)');
+            return;
+        }
+
+        // Ajouter le cintrage
+        try {
+            const diametre = parseFloat(document.getElementById('tube-diametre').value);
+            const epaisseur = parseFloat(document.getElementById('tube-epaisseur').value);
+            const longueur = parseFloat(document.getElementById('tube-longueur').value);
+
+            const paramsTube = new ParametresTube(diametre, epaisseur, longueur);
+            const paramsCintrage = new ParametresCintrage(angleNum, rayonNum, position);
+
+            // Valider
+            const validation = this.calculateur.validerCintrage(paramsTube, paramsCintrage);
+
+            if (!validation.valide) {
+                this.showModal('Erreur de validation', validation.erreurs.join('\n'));
+                return;
+            }
+
+            if (validation.avertissements.length > 0) {
+                this.showModal('Avertissement', validation.avertissements.join('\n'));
+            }
+
+            // Ajouter
+            this.calculateur.multiCintrage.ajouterCintrage(paramsCintrage);
+            this.mettreAJourListeCintrages();
+            this.simulerCintrage();
+
+            this.setStatus(`Cintrage ajouté à ${Math.round(position)}mm, ${angleNum}°, rayon ${rayonNum}mm`);
+
+        } catch (e) {
+            console.error('Erreur lors de l\'ajout du cintrage:', e);
+            this.showModal('Erreur', e.message);
+        }
     }
 };
 
