@@ -16,6 +16,7 @@ window.Interface = class Interface {
             this.bibliothequeMateriaux = new BibliothequeMateriaux();
             this.bibliothequeTubes = new BibliothequeTubes();
             this.gestionnaireProjets = new GestionnaireProjets();
+            this.historique = new GestionnaireHistorique(50);
 
             // Récupération des éléments DOM
             this.canvas = document.getElementById('visualization-canvas');
@@ -33,6 +34,7 @@ window.Interface = class Interface {
             this.modalMessage = document.getElementById('modal-message');
 
             this.selectedCintrageIndex = -1;
+            this.autosaveTimer = null;
 
             // Peupler les sélecteurs
             this.initialiserSelecteurs();
@@ -49,6 +51,14 @@ window.Interface = class Interface {
 
             // Afficher un message de bienvenue
             this.setStatus('Prêt - Entrez les paramètres et cliquez sur Simuler');
+
+            // Démarrer l'auto-sauvegarde
+            this.demarrerAutosave();
+
+            // Restaurer l'autosave si disponible (après un court délai)
+            setTimeout(() => {
+                this.restaurerAutosave();
+            }, 500);
 
             console.log('Interface initialisée avec succès');
         } catch (error) {
@@ -432,6 +442,62 @@ window.Interface = class Interface {
                 console.error('Erreur lors de la configuration de la table des cintrages:', e);
             }
             
+            // Raccourcis clavier globaux
+            document.addEventListener('keydown', (e) => {
+                // Ctrl+Z : Annuler
+                if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.annuler();
+                }
+                // Ctrl+Y ou Ctrl+Shift+Z : Refaire
+                else if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+                    e.preventDefault();
+                    this.refaire();
+                }
+                // Ctrl+S : Sauvegarder
+                else if (e.ctrlKey && e.key === 's') {
+                    e.preventDefault();
+                    this.sauvegarderProjet();
+                }
+                // Ctrl+O : Ouvrir/Charger
+                else if (e.ctrlKey && e.key === 'o') {
+                    e.preventDefault();
+                    this.chargerProjet();
+                }
+                // Ctrl+N : Nouveau projet
+                else if (e.ctrlKey && e.key === 'n') {
+                    e.preventDefault();
+                    this.nouveauProjet();
+                }
+                // Ctrl+E : Exporter JSON
+                else if (e.ctrlKey && e.key === 'e') {
+                    e.preventDefault();
+                    this.exporterProjetJSON();
+                }
+                // F1 : Aide
+                else if (e.key === 'F1') {
+                    e.preventDefault();
+                    window.open('aide.html', '_blank');
+                }
+                // Del ou Suppr : Supprimer le cintrage sélectionné
+                else if (e.key === 'Delete' || e.key === 'Del') {
+                    if (this.selectedCintrageIndex >= 0) {
+                        e.preventDefault();
+                        this.supprimerCintrage();
+                    }
+                }
+                // Espace : Simuler
+                else if (e.key === ' ' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+                    e.preventDefault();
+                    this.simulerCintrage();
+                }
+                // A : Ajouter (si pas dans un input)
+                else if (e.key === 'a' && !e.ctrlKey && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+                    e.preventDefault();
+                    this.ajouterCintrage();
+                }
+            });
+
             console.log('Configuration des écouteurs d\'événements terminée.');
         } catch (e) {
             console.error('Erreur globale dans setupEventListeners:', e);
@@ -590,7 +656,22 @@ window.Interface = class Interface {
                 this.showModal('Avertissement', messages + '\n\nLe cintrage a été ajouté mais vérifiez ces points.');
             }
 
+            // Capturer l'état avant
+            const avant = {
+                cintrages: this.calculateur.multiCintrage.cintrages.map(c => ({...c}))
+            };
+
             this.calculateur.multiCintrage.ajouterCintrage(paramsCintrage);
+
+            // Capturer l'état après
+            const apres = {
+                cintrages: this.calculateur.multiCintrage.cintrages.map(c => ({...c}))
+            };
+
+            // Enregistrer dans l'historique
+            const action = new ActionHistorique('ajouter_cintrage', avant, apres);
+            this.historique.ajouterAction(action);
+
             this.mettreAJourListeCintrages();
 
             this.setStatus('Cintrage ajouté');
@@ -605,7 +686,23 @@ window.Interface = class Interface {
      */
     supprimerCintrage() {
         if (this.selectedCintrageIndex >= 0) {
+            // Capturer l'état avant
+            const avant = {
+                cintrages: this.calculateur.multiCintrage.cintrages.map(c => ({...c})),
+                indexSupprime: this.selectedCintrageIndex
+            };
+
             this.calculateur.multiCintrage.supprimerCintrage(this.selectedCintrageIndex);
+
+            // Capturer l'état après
+            const apres = {
+                cintrages: this.calculateur.multiCintrage.cintrages.map(c => ({...c}))
+            };
+
+            // Enregistrer dans l'historique
+            const action = new ActionHistorique('supprimer_cintrage', avant, apres);
+            this.historique.ajouterAction(action);
+
             this.mettreAJourListeCintrages();
             this.selectedCintrageIndex = -1;
             this.setStatus('Cintrage supprimé');
@@ -1164,6 +1261,150 @@ window.Interface = class Interface {
                 fileInput.value = '';
             }
         };
+    }
+
+    /**
+     * Annule la dernière action
+     */
+    annuler() {
+        const action = this.historique.annuler();
+
+        if (!action) {
+            this.setStatus('Rien à annuler');
+            return;
+        }
+
+        // Activer le mode application pour éviter de créer une nouvelle action
+        this.historique.activerModeApplication();
+
+        try {
+            // Restaurer l'état avant
+            this.calculateur.multiCintrage.cintrages = action.avant.cintrages.map(c =>
+                new ParametresCintrage(c.angle, c.rayon, c.position)
+            );
+
+            this.mettreAJourListeCintrages();
+            this.setStatus(`Action annulée: ${action.type}`);
+        } catch (e) {
+            console.error('Erreur lors de l\'annulation:', e);
+            this.setStatus('Erreur lors de l\'annulation');
+        } finally {
+            this.historique.desactiverModeApplication();
+        }
+    }
+
+    /**
+     * Refait la dernière action annulée
+     */
+    refaire() {
+        const action = this.historique.refaire();
+
+        if (!action) {
+            this.setStatus('Rien à refaire');
+            return;
+        }
+
+        // Activer le mode application pour éviter de créer une nouvelle action
+        this.historique.activerModeApplication();
+
+        try {
+            // Restaurer l'état après
+            this.calculateur.multiCintrage.cintrages = action.apres.cintrages.map(c =>
+                new ParametresCintrage(c.angle, c.rayon, c.position)
+            );
+
+            this.mettreAJourListeCintrages();
+            this.setStatus(`Action refaite: ${action.type}`);
+        } catch (e) {
+            console.error('Erreur lors du refaire:', e);
+            this.setStatus('Erreur lors du refaire');
+        } finally {
+            this.historique.desactiverModeApplication();
+        }
+    }
+
+    /**
+     * Démarre l'auto-sauvegarde toutes les 30 secondes
+     */
+    demarrerAutosave() {
+        // Arrêter l'ancien timer s'il existe
+        this.arreterAutosave();
+
+        // Démarrer un nouveau timer (30 secondes)
+        this.autosaveTimer = setInterval(() => {
+            this.effectuerAutosave();
+        }, 30000); // 30 secondes
+
+        console.log('Auto-sauvegarde activée (toutes les 30 secondes)');
+    }
+
+    /**
+     * Arrête l'auto-sauvegarde
+     */
+    arreterAutosave() {
+        if (this.autosaveTimer) {
+            clearInterval(this.autosaveTimer);
+            this.autosaveTimer = null;
+            console.log('Auto-sauvegarde arrêtée');
+        }
+    }
+
+    /**
+     * Effectue une auto-sauvegarde
+     */
+    effectuerAutosave() {
+        try {
+            // Ne sauvegarder que s'il y a des données
+            const hasCintrages = this.calculateur.multiCintrage.cintrages.length > 0;
+            const diametre = parseFloat(document.getElementById('tube-diametre').value);
+            const epaisseur = parseFloat(document.getElementById('tube-epaisseur').value);
+            const longueur = parseFloat(document.getElementById('tube-longueur').value);
+
+            // Vérifier qu'il y a au moins quelque chose à sauvegarder
+            if (!hasCintrages && diametre === 20 && epaisseur === 1.5 && longueur === 1000) {
+                // Valeurs par défaut, rien à sauvegarder
+                return;
+            }
+
+            const materiauId = document.getElementById('tube-materiau').value;
+
+            const parametresTube = {
+                diametre,
+                epaisseur,
+                longueur
+            };
+
+            const cintrages = this.calculateur.multiCintrage.cintrages.map(c => ({
+                angle: c.angle,
+                rayon: c.rayon,
+                position: c.position
+            }));
+
+            const projet = new ProjetCintrage('Autosave', parametresTube, materiauId, cintrages);
+            this.gestionnaireProjets.autosave(projet);
+
+            console.log('Auto-sauvegarde effectuée');
+        } catch (e) {
+            console.error('Erreur lors de l\'auto-sauvegarde:', e);
+        }
+    }
+
+    /**
+     * Restaure l'auto-sauvegarde au démarrage
+     */
+    restaurerAutosave() {
+        try {
+            const autosave = this.gestionnaireProjets.chargerAutosave();
+
+            if (autosave && autosave.cintrages && autosave.cintrages.length > 0) {
+                if (confirm('Un projet non sauvegardé a été trouvé. Voulez-vous le restaurer ?')) {
+                    this.appliquerProjet(autosave);
+                    this.setStatus('Projet restauré depuis l\'auto-sauvegarde');
+                }
+            }
+        } catch (e) {
+            console.error('Erreur lors de la restauration de l\'autosave:', e);
+        }
     }
 };
 
