@@ -52,8 +52,25 @@
     <main>
         <div class="container">
             <div class="canvas-container">
-                <div class="label-frame">Visualisation</div>
-                <canvas id="visualization-canvas" width="1024" height="600"></canvas>
+                <div class="visualization-header">
+                    <div class="label-frame">Visualisation</div>
+                    <div class="view-tabs">
+                        <button id="tab-2d" class="tab-button active">2D</button>
+                        <button id="tab-3d" class="tab-button">3D</button>
+                    </div>
+                </div>
+                <div id="view-2d" class="view-container active">
+                    <canvas id="visualization-canvas" width="1024" height="600"></canvas>
+                </div>
+                <div id="view-3d" class="view-container">
+                    <div id="canvas-3d"></div>
+                    <div class="view-3d-controls">
+                        <button id="btn-3d-reset" title="Réinitialiser la caméra">🔄 Reset caméra</button>
+                        <div class="view-3d-info">
+                            <small>Clic gauche: rotation | Molette: zoom | Clic droit: panoramique</small>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="controls-panel">
@@ -124,6 +141,7 @@
                 <div class="buttons-container">
                     <button id="btn-simuler" class="action-button">▶ Simuler</button>
                     <button id="btn-reinitialiser">↺ Réinitialiser</button>
+                    <button id="btn-mode-edition" title="Activer/désactiver le mode édition visuelle">✏️ Mode édition</button>
                 </div>
 
                 <div class="panel-section">
@@ -157,12 +175,16 @@
     <!-- Chargement des scripts -->
     <script src="js/lib/file-saver.js"></script>
     <script src="js/lib/jspdf.min.js"></script>
+    <!-- Three.js pour la visualisation 3D -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
     <script src="js/modules/calculs.js"></script>
     <script src="js/modules/materiaux.js"></script>
     <script src="js/modules/tubes-standards.js"></script>
     <script src="js/modules/projets.js"></script>
     <script src="js/modules/historique.js"></script>
     <script src="js/modules/templates.js"></script>
+    <script src="js/modules/visualization3d.js"></script>
     <script src="js/modules/export.js"></script>
     <script src="js/modules/interface.js"></script>
     <script src="js/main.js"></script>

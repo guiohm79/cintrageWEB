@@ -41,6 +41,17 @@ window.Interface = class Interface {
             this.triColonne = null; // Colonne actuellement triée
             this.triOrdre = 'asc'; // 'asc' ou 'desc'
 
+            // Visualisation 3D
+            this.visualization3D = null;
+            this.vueActive = '2d'; // '2d' ou '3d'
+            this.initialiserVisualization3D();
+
+            // Mode édition visuelle
+            this.modeEdition = false;
+            this.cintrageEnDrag = null;
+            this.offsetDrag = { x: 0, y: 0 };
+            this.poignees = []; // Position des poignées de cintrage
+
             // Peupler les sélecteurs
             this.initialiserSelecteurs();
 
@@ -70,6 +81,60 @@ window.Interface = class Interface {
             console.error('Erreur lors de l\'initialisation de l\'interface:', error);
             this.afficherErreurInterface(error.message);
         }
+    }
+
+    /**
+     * Initialise la visualisation 3D
+     */
+    initialiserVisualization3D() {
+        try {
+            if (typeof Visualization3D !== 'undefined') {
+                this.visualization3D = new Visualization3D('canvas-3d');
+                console.log('Visualisation 3D initialisée');
+            } else {
+                console.warn('Visualization3D non disponible');
+            }
+        } catch (error) {
+            console.error('Erreur lors de l\'initialisation de la visualisation 3D:', error);
+        }
+    }
+
+    /**
+     * Bascule entre les vues 2D et 3D
+     * @param {string} vue - 'view-2d' ou 'view-3d'
+     */
+    basculerVue(vue) {
+        this.vueActive = vue;
+
+        // Gérer les onglets
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.view-container').forEach(container => container.classList.remove('active'));
+
+        if (vue === '2d') {
+            document.getElementById('tab-2d').classList.add('active');
+            document.getElementById('view-2d').classList.add('active');
+        } else {
+            document.getElementById('tab-3d').classList.add('active');
+            document.getElementById('view-3d').classList.add('active');
+
+            // Mettre à jour la vue 3D
+            this.mettreAJourVue3D();
+        }
+
+        this.setStatus(`Vue ${vue.toUpperCase()} activée`);
+    }
+
+    /**
+     * Met à jour la visualisation 3D avec les cintrages actuels
+     */
+    mettreAJourVue3D() {
+        if (!this.visualization3D) return;
+
+        const diametre = parseFloat(document.getElementById('tube-diametre').value);
+        const longueur = parseFloat(document.getElementById('tube-longueur').value);
+        const cintrages = this.calculateur.multiCintrage.cintrages;
+
+        this.visualization3D.afficherTube(cintrages, diametre, longueur);
     }
 
     /**
@@ -392,6 +457,46 @@ window.Interface = class Interface {
                     this.mettreAJourRayonMinimum();
                 });
             }
+
+            // Onglets 2D/3D
+            const tab2D = document.getElementById('tab-2d');
+            if (tab2D) {
+                tab2D.addEventListener('click', () => {
+                    this.basculerVue('2d');
+                });
+            }
+
+            const tab3D = document.getElementById('tab-3d');
+            if (tab3D) {
+                tab3D.addEventListener('click', () => {
+                    this.basculerVue('3d');
+                });
+            }
+
+            // Bouton reset caméra 3D
+            const btnResetCamera = document.getElementById('btn-3d-reset');
+            if (btnResetCamera) {
+                btnResetCamera.addEventListener('click', () => {
+                    if (this.visualization3D) {
+                        this.visualization3D.reinitialiserCamera();
+                        this.setStatus('Caméra 3D réinitialisée');
+                    }
+                });
+            }
+
+            // Bouton mode édition
+            const btnModeEdition = document.getElementById('btn-mode-edition');
+            if (btnModeEdition) {
+                btnModeEdition.addEventListener('click', () => {
+                    this.toggleModeEdition();
+                });
+            }
+
+            // Événements de souris sur le canvas pour le mode édition
+            this.canvas.addEventListener('mousedown', (e) => this.onCanvasMouseDown(e));
+            this.canvas.addEventListener('mousemove', (e) => this.onCanvasMouseMove(e));
+            this.canvas.addEventListener('mouseup', (e) => this.onCanvasMouseUp(e));
+            this.canvas.addEventListener('mouseleave', (e) => this.onCanvasMouseUp(e));
 
             // Gestion des tooltips
             try {
@@ -824,7 +929,15 @@ window.Interface = class Interface {
             if (this.cintragesInfo) {
                 this.cintragesInfo.textContent = info;
             }
-            
+
+            // Mettre à jour la vue 3D
+            if (this.vueActive === '3d') {
+                this.mettreAJourVue3D();
+            }
+
+            // Dessiner les poignées en mode édition
+            this.dessinerPoignees();
+
             this.setStatus('Simulation terminée');
         } catch (e) {
             console.error('Erreur lors de la simulation:', e);
@@ -1687,6 +1800,166 @@ window.Interface = class Interface {
             // Ajouter un curseur pointer pour indiquer que c'est cliquable
             th.style.cursor = 'pointer';
             th.style.userSelect = 'none';
+        });
+    }
+
+    /**
+     * Active/désactive le mode édition visuelle
+     */
+    toggleModeEdition() {
+        this.modeEdition = !this.modeEdition;
+
+        const btn = document.getElementById('btn-mode-edition');
+        if (btn) {
+            if (this.modeEdition) {
+                btn.classList.add('active');
+                this.setStatus('Mode édition activé - Glissez les points de cintrage');
+                this.canvas.style.cursor = 'crosshair';
+            } else {
+                btn.classList.remove('active');
+                this.setStatus('Mode édition désactivé');
+                this.canvas.style.cursor = 'default';
+                this.cintrageEnDrag = null;
+            }
+        }
+
+        // Redessiner pour afficher/masquer les poignées
+        this.simulerCintrage();
+    }
+
+    /**
+     * Gestion du mousedown sur le canvas
+     */
+    onCanvasMouseDown(e) {
+        if (!this.modeEdition) return;
+
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Vérifier si on clique sur une poignée
+        for (let i = 0; i < this.poignees.length; i++) {
+            const poignee = this.poignees[i];
+            const distance = Math.sqrt(
+                Math.pow(mouseX - poignee.x, 2) +
+                Math.pow(mouseY - poignee.y, 2)
+            );
+
+            if (distance < 10) {
+                // On a cliqué sur cette poignée
+                this.cintrageEnDrag = {
+                    index: i,
+                    startX: mouseX,
+                    startY: mouseY,
+                    cintrageOriginal: {...this.calculateur.multiCintrage.cintrages[i]}
+                };
+                this.canvas.style.cursor = 'grabbing';
+                return;
+            }
+        }
+    }
+
+    /**
+     * Gestion du mousemove sur le canvas
+     */
+    onCanvasMouseMove(e) {
+        if (!this.modeEdition) return;
+
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Si on est en train de déplacer une poignée
+        if (this.cintrageEnDrag) {
+            const deltaX = mouseX - this.cintrageEnDrag.startX;
+
+            // Mise à jour de la position du cintrage
+            const cintrage = this.calculateur.multiCintrage.cintrages[this.cintrageEnDrag.index];
+            const echelle = parseFloat(document.getElementById('tube-longueur').value) / this.canvas.width;
+            cintrage.position = Math.max(10, this.cintrageEnDrag.cintrageOriginal.position + deltaX * echelle);
+
+            // Redessiner
+            this.simulerCintrage();
+            this.mettreAJourListeCintrages();
+
+            return;
+        }
+
+        // Sinon, vérifier si on survole une poignée pour changer le curseur
+        let surPoignee = false;
+        for (let poignee of this.poignees) {
+            const distance = Math.sqrt(
+                Math.pow(mouseX - poignee.x, 2) +
+                Math.pow(mouseY - poignee.y, 2)
+            );
+
+            if (distance < 10) {
+                surPoignee = true;
+                break;
+            }
+        }
+
+        this.canvas.style.cursor = surPoignee ? 'grab' : 'crosshair';
+    }
+
+    /**
+     * Gestion du mouseup sur le canvas
+     */
+    onCanvasMouseUp(e) {
+        if (!this.modeEdition) return;
+
+        if (this.cintrageEnDrag) {
+            // Capturer l'état pour l'historique
+            const avant = { cintrages: [this.cintrageEnDrag.cintrageOriginal] };
+            const apres = {
+                cintrages: [{...this.calculateur.multiCintrage.cintrages[this.cintrageEnDrag.index]}]
+            };
+
+            const action = new ActionHistorique('modifier_cintrage', avant, apres);
+            this.historique.ajouterAction(action);
+
+            this.cintrageEnDrag = null;
+            this.canvas.style.cursor = 'crosshair';
+            this.setStatus('Position modifiée');
+        }
+    }
+
+    /**
+     * Dessine les poignées de cintrage en mode édition
+     */
+    dessinerPoignees() {
+        if (!this.modeEdition || !this.calculateur.multiCintrage.cintrages.length) {
+            this.poignees = [];
+            return;
+        }
+
+        const longueur = parseFloat(document.getElementById('tube-longueur').value);
+        const echelle = this.canvas.width / longueur;
+
+        this.poignees = [];
+
+        this.calculateur.multiCintrage.cintrages.forEach((cintrage, index) => {
+            const x = cintrage.position * echelle;
+            const y = this.canvas.height / 2;
+
+            // Dessiner un cercle pour la poignée
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, 8, 0, 2 * Math.PI);
+            this.ctx.fillStyle = '#FF5722';
+            this.ctx.fill();
+            this.ctx.strokeStyle = '#FFFFFF';
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+
+            // Ajouter un label avec le numéro
+            this.ctx.fillStyle = '#FFFFFF';
+            this.ctx.font = 'bold 12px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(`${index + 1}`, x, y);
+
+            // Enregistrer la position de la poignée
+            this.poignees.push({ x, y, index });
         });
     }
 };
