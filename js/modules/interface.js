@@ -51,6 +51,7 @@ window.Interface = class Interface {
             this.cintrageEnDrag = null;
             this.pointSurvol = null; // Position de la souris en mode édition
             this.poignees = []; // Position des poignées de cintrage
+            this.pointDepart = null; // Premier clic en mode mesure (null si pas de mesure en cours)
 
             // Peupler les sélecteurs
             this.initialiserSelecteurs();
@@ -1813,7 +1814,7 @@ window.Interface = class Interface {
         if (btn) {
             if (this.modeEdition) {
                 btn.classList.add('active');
-                this.setStatus('Mode édition: Cliquez sur le tube pour ajouter un point de cintrage');
+                this.setStatus('Mode édition: 1er clic = point de départ | 2ème clic = position du cintrage');
                 this.canvas.style.cursor = 'crosshair';
             } else {
                 btn.classList.remove('active');
@@ -1821,14 +1822,15 @@ window.Interface = class Interface {
                 this.canvas.style.cursor = 'default';
                 this.cintrageEnDrag = null;
                 this.pointSurvol = null;
+                this.pointDepart = null;
             }
         }
 
-        // Redessiner pour afficher/masquer la règle et les poignées
+        // Redessiner
         if (this.calculateur.multiCintrage.cintrages.length > 0) {
             this.simulerCintrage();
         } else {
-            this.dessinerRegleGraduee();
+            this.dessinerGrille();
         }
     }
 
@@ -1863,19 +1865,48 @@ window.Interface = class Interface {
             }
         }
 
-        // Sinon, on ajoute un nouveau point de cintrage
+        // Sinon, système de mesure en 2 clics
         const longueur = parseFloat(document.getElementById('tube-longueur').value);
         const echelle = this.canvas.width / longueur;
         const position = mouseX / echelle;
 
-        // Vérifier que la position est valide (dans le tube)
-        if (position < 10 || position > longueur - 10) {
-            this.showModal('Position invalide', 'Le point de cintrage doit être entre 10mm et ' + (longueur - 10) + 'mm');
-            return;
+        if (!this.pointDepart) {
+            // PREMIER CLIC : Enregistrer le point de départ
+            this.pointDepart = {
+                x: mouseX,
+                position: position
+            };
+            this.setStatus(`Point de départ: ${Math.round(position)}mm - Cliquez sur le 2ème point`);
+        } else {
+            // DEUXIEME CLIC : Créer le cintrage à cette position
+            const distance = Math.abs(position - this.pointDepart.position);
+
+            if (distance < 10) {
+                this.showModal('Distance trop courte', 'La distance minimum est de 10mm');
+                this.pointDepart = null;
+                this.setStatus('Mode édition: 1er clic = point de départ | 2ème clic = position du cintrage');
+                if (this.calculateur.multiCintrage.cintrages.length > 0) {
+                    this.simulerCintrage();
+                } else {
+                    this.dessinerGrille();
+                }
+                return;
+            }
+
+            // Demander angle et rayon
+            this.demanderParametresCintrage(position);
+            this.pointDepart = null;
         }
 
-        // Demander angle et rayon via prompt (temporaire, on améliorera avec un modal)
-        this.demanderParametresCintrage(position);
+        // Redessiner pour afficher/masquer la règle
+        if (this.calculateur.multiCintrage.cintrages.length > 0) {
+            this.simulerCintrage();
+        } else {
+            this.dessinerGrille();
+            if (this.pointDepart) {
+                this.dessinerRegleMesure(this.pointDepart.x, this.pointDepart.position, mouseX, position);
+            }
+        }
     }
 
     /**
@@ -1909,9 +1940,6 @@ window.Interface = class Interface {
         const echelle = this.canvas.width / longueur;
         const position = mouseX / echelle;
 
-        // Enregistrer la position pour le dessin
-        this.pointSurvol = { x: mouseX, position: Math.round(position) };
-
         // Vérifier si on survole une poignée existante
         let surPoignee = false;
         for (let poignee of this.poignees) {
@@ -1928,11 +1956,22 @@ window.Interface = class Interface {
 
         this.canvas.style.cursor = surPoignee ? 'grab' : 'crosshair';
 
-        // Redessiner pour afficher le curseur de position
-        if (this.calculateur.multiCintrage.cintrages.length > 0) {
-            this.simulerCintrage();
+        // Redessiner pour afficher la règle de mesure si un point de départ est défini
+        if (this.pointDepart) {
+            if (this.calculateur.multiCintrage.cintrages.length > 0) {
+                this.simulerCintrage();
+            } else {
+                this.dessinerGrille();
+            }
+            // Dessiner la règle de mesure entre le point de départ et la souris
+            this.dessinerRegleMesure(this.pointDepart.x, this.pointDepart.position, mouseX, position);
         } else {
-            this.dessinerRegleGraduee();
+            // Redessiner normalement
+            if (this.calculateur.multiCintrage.cintrages.length > 0) {
+                this.simulerCintrage();
+            } else {
+                this.dessinerGrille();
+            }
         }
     }
 
@@ -1996,95 +2035,74 @@ window.Interface = class Interface {
             // Enregistrer la position de la poignée
             this.poignees.push({ x, y, index });
         });
-
-        // Dessiner le curseur de position au survol
-        if (this.pointSurvol) {
-            this.dessinerCurseurPosition(this.pointSurvol.x, this.pointSurvol.position);
-        }
-
-        // Dessiner la règle graduée
-        this.dessinerRegleGraduee();
     }
 
     /**
-     * Dessine la règle graduée en bas du canvas
+     * Dessine une règle de mesure entre deux points
+     * @param {number} x1 - Position X du point de départ
+     * @param {number} pos1 - Position en mm du point de départ
+     * @param {number} x2 - Position X du point d'arrivée
+     * @param {number} pos2 - Position en mm du point d'arrivée
      */
-    dessinerRegleGraduee() {
+    dessinerRegleMesure(x1, pos1, x2, pos2) {
         if (!this.modeEdition) return;
 
-        const longueur = parseFloat(document.getElementById('tube-longueur').value);
-        const echelle = this.canvas.width / longueur;
-        const y = this.canvas.height - 40;
+        const y = this.canvas.height / 2;
+        const distance = Math.abs(pos2 - pos1);
 
-        // Ligne de base de la règle
-        this.ctx.strokeStyle = '#333';
-        this.ctx.lineWidth = 2;
+        // Ligne horizontale entre les 2 points
+        this.ctx.strokeStyle = '#FF5722';
+        this.ctx.lineWidth = 3;
+        this.ctx.setLineDash([10, 5]);
         this.ctx.beginPath();
-        this.ctx.moveTo(0, y);
-        this.ctx.lineTo(this.canvas.width, y);
-        this.ctx.stroke();
-
-        // Graduations tous les 50mm
-        this.ctx.font = '10px Arial';
-        this.ctx.fillStyle = '#333';
-        this.ctx.textAlign = 'center';
-
-        for (let position = 0; position <= longueur; position += 50) {
-            const x = position * echelle;
-
-            // Grande graduation tous les 100mm
-            if (position % 100 === 0) {
-                this.ctx.lineWidth = 2;
-                this.ctx.beginPath();
-                this.ctx.moveTo(x, y - 15);
-                this.ctx.lineTo(x, y + 15);
-                this.ctx.stroke();
-
-                // Label
-                this.ctx.fillText(`${position}`, x, y + 28);
-            } else {
-                // Petite graduation
-                this.ctx.lineWidth = 1;
-                this.ctx.beginPath();
-                this.ctx.moveTo(x, y - 8);
-                this.ctx.lineTo(x, y + 8);
-                this.ctx.stroke();
-            }
-        }
-
-        // Dessiner le curseur de position si on survole
-        if (this.pointSurvol) {
-            this.dessinerCurseurPosition(this.pointSurvol.x, this.pointSurvol.position);
-        }
-    }
-
-    /**
-     * Dessine un curseur vertical indiquant la position de la souris
-     */
-    dessinerCurseurPosition(x, position) {
-        // Ligne verticale
-        this.ctx.strokeStyle = '#2196F3';
-        this.ctx.lineWidth = 2;
-        this.ctx.setLineDash([5, 5]);
-        this.ctx.beginPath();
-        this.ctx.moveTo(x, 0);
-        this.ctx.lineTo(x, this.canvas.height - 40);
+        this.ctx.moveTo(x1, y);
+        this.ctx.lineTo(x2, y);
         this.ctx.stroke();
         this.ctx.setLineDash([]);
 
-        // Label avec la position
-        const label = `${position} mm`;
-        const padding = 6;
+        // Traits verticaux aux extrémités
+        this.ctx.strokeStyle = '#FF5722';
+        this.ctx.lineWidth = 2;
+
+        // Trait au point de départ
+        this.ctx.beginPath();
+        this.ctx.moveTo(x1, y - 30);
+        this.ctx.lineTo(x1, y + 30);
+        this.ctx.stroke();
+
+        // Trait au point d'arrivée
+        this.ctx.beginPath();
+        this.ctx.moveTo(x2, y - 30);
+        this.ctx.lineTo(x2, y + 30);
+        this.ctx.stroke();
+
+        // Label avec la distance au milieu
+        const midX = (x1 + x2) / 2;
+        const label = `${Math.round(distance)} mm`;
+        const padding = 8;
+
+        this.ctx.font = 'bold 14px Arial';
         const textWidth = this.ctx.measureText(label).width;
 
-        this.ctx.fillStyle = '#2196F3';
-        this.ctx.fillRect(x - textWidth / 2 - padding, 10, textWidth + padding * 2, 20);
+        // Fond du label
+        this.ctx.fillStyle = '#FF5722';
+        this.ctx.fillRect(midX - textWidth / 2 - padding, y - 50, textWidth + padding * 2, 26);
 
+        // Texte
         this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.font = 'bold 12px Arial';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        this.ctx.fillText(label, x, 20);
+        this.ctx.fillText(label, midX, y - 37);
+
+        // Labels pour les positions aux extrémités
+        this.ctx.font = '11px Arial';
+        this.ctx.fillStyle = '#666';
+
+        // Position départ
+        this.ctx.fillText(`${Math.round(pos1)}mm`, x1, y + 45);
+
+        // Position arrivée
+        this.ctx.fillText(`${Math.round(pos2)}mm`, x2, y + 45);
     }
 
     /**
