@@ -336,6 +336,24 @@ button:hover {
     margin-bottom: 5px;
 }
 
+#btn-mode-edition {
+    background-color: #757575;
+    color: white;
+}
+
+#btn-mode-edition.active {
+    background-color: #4CAF50;
+    font-weight: bold;
+}
+
+#btn-mode-edition:hover {
+    background-color: #616161;
+}
+
+#btn-mode-edition.active:hover {
+    background-color: #45a049;
+}
+
 /* Info section */
 .info-text {
     font-size: 0.9rem;
